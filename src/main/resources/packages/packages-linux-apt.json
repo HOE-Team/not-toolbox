@@ -1,0 +1,164 @@
+[
+  {
+    "name": "HWiNFO",
+    "description": "硬件信息实时监控",
+    "url": "https://www.hwinfo.com/",
+    "category": "系统信息与硬件监控工具",
+    "isProprietarySoftware": true,
+    "eulaUrl": "https://www.hwinfo.com/forum/threads/hwinfo-license-agreement.123/",
+    "aptName": "hwinfo"
+  },
+  {
+    "name": "lshw",
+    "description": "硬件信息检测工具",
+    "url": "https://ezix.org/project/wiki/HardwareLiSter",
+    "category": "系统信息与硬件监控工具",
+    "licenseUrl": "https://ezix.org/project/wiki/HardwareLiSter#License",
+    "licenseType": "GPL-2.0",
+    "aptName": "lshw"
+  },
+  {
+    "name": "dmidecode",
+    "description": "DMI表信息读取工具",
+    "url": "https://www.nongnu.org/dmidecode/",
+    "category": "系统信息与硬件监控工具",
+    "licenseUrl": "https://www.nongnu.org/dmidecode/",
+    "licenseType": "GPL-2.0",
+    "aptName": "dmidecode"
+  },
+  {
+    "name": "nvidia-driver",
+    "description": "NVIDIA显卡驱动",
+    "url": "https://www.nvidia.com/Download/index.aspx",
+    "category": "驱动程序管理工具",
+    "isProprietarySoftware": true,
+    "eulaUrl": "https://www.nvidia.com/en-us/drivers/geforce-license/",
+    "aptName": "nvidia-driver-535"
+  },
+  {
+    "name": "mesa-vulkan-drivers",
+    "description": "开源显卡驱动",
+    "url": "https://www.mesa3d.org/",
+    "category": "驱动程序管理工具",
+    "licenseUrl": "https://www.mesa3d.org/license.html",
+    "licenseType": "MIT",
+    "aptName": "mesa-vulkan-drivers"
+  },
+  {
+    "name": "VLC",
+    "description": "多媒体播放器",
+    "url": "https://www.videolan.org/vlc/",
+    "category": "媒体工具",
+    "licenseUrl": "https://www.videolan.org/legal.html",
+    "licenseType": "GPL-2.0",
+    "aptName": "vlc"
+  },
+  {
+    "name": "SMPlayer",
+    "description": "多功能播放器",
+    "url": "https://github.com/smplayer-dev/smplayer/releases/latest",
+    "category": "媒体工具",
+    "licenseUrl": "https://github.com/smplayer-dev/smplayer/blob/master/Copying.txt",
+    "licenseType": "GPL-2.0",
+    "aptName": "smplayer"
+  },
+  {
+    "name": "Kodi",
+    "description": "家庭影院中心",
+    "url": "https://kodi.tv/",
+    "category": "媒体工具",
+    "licenseUrl": "https://github.com/xbmc/xbmc/blob/master/LICENSES/GPL-2.0-or-later",
+    "licenseType": "GPL-2.0",
+    "aptName": "kodi"
+  },
+  {
+    "name": "OpenShot",
+    "description": "开源剪辑软件",
+    "url": "https://www.openshot.org/zh-hans/",
+    "category": "媒体工具",
+    "licenseUrl": "https://github.com/OpenShot/openshot-qt/blob/develop/COPYING",
+    "licenseType": "GPL-3.0",
+    "aptName": "openshot"
+  },
+  {
+    "name": "kdenlive",
+    "description": "KDE 非线性视频编辑器",
+    "url": "https://kdenlive.org/zh-cn/",
+    "category": "媒体工具",
+    "licenseUrl": "https://invent.kde.org/multimedia/kdenlive/-/blob/master/COPYING",
+    "licenseType": "GPL-3.0",
+    "aptName": "kdenlive"
+  },
+  {
+    "name": "OBS Studio",
+    "description": "专业录制软件",
+    "url": "https://obsproject.com/zh-cn/download",
+    "category": "媒体工具",
+    "licenseUrl": "https://github.com/obsproject/obs-studio/blob/master/COPYING",
+    "licenseType": "GPL-2.0",
+    "aptName": "obs-studio"
+  },
+  {
+    "name": "rsync",
+    "description": "文件同步工具",
+    "url": "https://rsync.samba.org/",
+    "category": "文件工具",
+    "licenseUrl": "https://rsync.samba.org/",
+    "licenseType": "GPL-3.0",
+    "aptName": "rsync"
+  },
+  {
+    "name": "FileLight",
+    "description": "磁盘占用查看器",
+    "url": "https://apps.kde.org/zh-cn/filelight/",
+    "category": "文件工具",
+    "licenseUrl": "https://invent.kde.org/utilities/filelight/-/tree/master/LICENSES?ref_type=heads",
+    "licenseType": "GPL-3.0",
+    "aptName": "filelight"
+  },
+  {
+    "name": "Git",
+    "description": "版本控制工具",
+    "url": "https://git-scm.com/",
+    "category": "开发人员工具",
+    "licenseUrl": "https://github.com/git/git/blob/master/COPYING",
+    "licenseType": "GPL-2.0",
+    "aptName": "git"
+  },
+  {
+    "name": "vim",
+    "description": "文本编辑器",
+    "url": "https://www.vim.org/",
+    "category": "开发人员工具",
+    "licenseUrl": "https://github.com/vim/vim/blob/master/LICENSE",
+    "licenseType": "Vim",
+    "aptName": "vim"
+  },
+  {
+    "name": "GNU Nano",
+    "description": "轻量级命令行文本编辑器",
+    "url": "https://www.nano-editor.org/",
+    "category": "开发人员工具",
+    "licenseUrl": "https://www.nano-editor.org/dist/latest/COPYING",
+    "licenseType": "GPL-3.0",
+    "aptName": "nano"
+  },
+  {
+    "name": "vscode",
+    "description": "代码编辑器",
+    "url": "https://code.visualstudio.com/",
+    "category": "开发人员工具",
+    "isProprietarySoftware": true,
+    "eulaUrl": "https://code.visualstudio.com/license",
+    "aptName": "code"
+  },
+  {
+    "name": "woeusb",
+    "description": "USB镜像烧录工具",
+    "url": "https://github.com/slacka/WoeUSB",
+    "category": "其它工具",
+    "licenseUrl": "https://github.com/slacka/WoeUSB/blob/master/COPYING",
+    "licenseType": "GPL-3.0",
+    "aptName": "woeusb"
+  }
+]

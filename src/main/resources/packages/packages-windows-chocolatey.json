@@ -1,0 +1,119 @@
+[
+  {
+    "name": "HWiNFO",
+    "description": "硬件信息实时监控",
+    "url": "https://www.hwinfo.com/",
+    "category": "系统信息与硬件监控工具",
+    "isProprietarySoftware": true,
+    "eulaUrl": "https://www.hwinfo.com/forum/threads/hwinfo-license-agreement.123/",
+    "chocolateyName": "hwinfo"
+  },
+  {
+    "name": "VLC",
+    "description": "多媒体播放器",
+    "url": "https://www.videolan.org/vlc/",
+    "category": "媒体工具",
+    "licenseUrl": "https://www.videolan.org/legal.html",
+    "licenseType": "GPL-2.0",
+    "chocolateyName": "vlc"
+  },
+  {
+    "name": "SMPlayer",
+    "description": "多功能播放器",
+    "url": "https://github.com/smplayer-dev/smplayer/releases/latest",
+    "category": "媒体工具",
+    "licenseUrl": "https://github.com/smplayer-dev/smplayer/blob/master/Copying.txt",
+    "licenseType": "GPL-2.0",
+    "chocolateyName": "smplayer"
+  },
+  {
+    "name": "Kodi",
+    "description": "家庭影院中心",
+    "url": "https://kodi.tv/",
+    "category": "媒体工具",
+    "licenseUrl": "https://github.com/xbmc/xbmc/blob/master/LICENSES/GPL-2.0-or-later",
+    "licenseType": "GPL-2.0",
+    "chocolateyName": "kodi"
+  },
+  {
+    "name": "OpenShot",
+    "description": "开源剪辑软件",
+    "url": "https://www.openshot.org/zh-hans/",
+    "category": "媒体工具",
+    "licenseUrl": "https://github.com/OpenShot/openshot-qt/blob/develop/COPYING",
+    "licenseType": "GPL-3.0",
+    "chocolateyName": "openshot"
+  },
+  {
+    "name": "kdenlive",
+    "description": "KDE 非线性视频编辑器",
+    "url": "https://kdenlive.org/zh-cn/",
+    "category": "媒体工具",
+    "licenseUrl": "https://invent.kde.org/multimedia/kdenlive/-/blob/master/COPYING",
+    "licenseType": "GPL-3.0",
+    "chocolateyName": "kdenlive"
+  },
+  {
+    "name": "OBS Studio",
+    "description": "专业录制软件",
+    "url": "https://obsproject.com/zh-cn/download",
+    "category": "媒体工具",
+    "licenseUrl": "https://github.com/obsproject/obs-studio/blob/master/COPYING",
+    "licenseType": "GPL-2.0",
+    "chocolateyName": "obs-studio"
+  },
+  {
+    "name": "FileLight",
+    "description": "磁盘占用查看器",
+    "url": "https://apps.kde.org/zh-cn/filelight/",
+    "category": "文件工具",
+    "licenseUrl": "https://invent.kde.org/utilities/filelight/-/tree/master/LICENSES?ref_type=heads",
+    "licenseType": "GPL-3.0",
+    "chocolateyName": "filelight"
+  },
+  {
+    "name": "Git",
+    "description": "版本控制工具",
+    "url": "https://git-scm.com/",
+    "category": "开发人员工具",
+    "licenseUrl": "https://github.com/git/git/blob/master/COPYING",
+    "licenseType": "GPL-2.0",
+    "chocolateyName": "git"
+  },
+  {
+    "name": "vim",
+    "description": "文本编辑器",
+    "url": "https://www.vim.org/",
+    "category": "开发人员工具",
+    "licenseUrl": "https://github.com/vim/vim/blob/master/LICENSE",
+    "licenseType": "Vim",
+    "chocolateyName": "vim"
+  },
+  {
+    "name": "GNU Nano",
+    "description": "轻量级命令行文本编辑器",
+    "url": "https://www.nano-editor.org/",
+    "category": "开发人员工具",
+    "licenseUrl": "https://www.nano-editor.org/dist/latest/COPYING",
+    "licenseType": "GPL-3.0",
+    "chocolateyName": "nano"
+  },
+  {
+    "name": "vscode",
+    "description": "代码编辑器",
+    "url": "https://code.visualstudio.com/",
+    "category": "开发人员工具",
+    "isProprietarySoftware": true,
+    "eulaUrl": "https://code.visualstudio.com/license",
+    "chocolateyName": "vscode"
+  },
+  {
+    "name": "woeusb",
+    "description": "USB镜像烧录工具",
+    "url": "https://github.com/slacka/WoeUSB",
+    "category": "其它工具",
+    "licenseUrl": "https://github.com/slacka/WoeUSB/blob/master/COPYING",
+    "licenseType": "GPL-3.0",
+    "chocolateyName": "rufus"
+  }
+]
