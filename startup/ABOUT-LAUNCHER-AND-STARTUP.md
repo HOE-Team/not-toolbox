@@ -54,7 +54,7 @@ iscc pack-exe.iss
 若需修改安装程序的信息，请修改pack-exe.iss
 
 **NTB Launcher Pack Tools 授权信息**：  
-NTB Launcher 使用 [MIT License](../LICENSES/LICENSE-MIT-NTB-LAUNCHER-PACK-TOOLS) 开源  
+NTB Launcher 使用 [MIT License](../LICENSES/LICENSE-MIT-NTB-LAUNCHER-PACK-TOOL) 开源  
 版权所有 ©2026 HOE Team。保留所有权利。
 
 ## Linux 平台启动脚本
