@@ -17,7 +17,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
@@ -145,9 +144,9 @@ fun TerminalScreen() {
             OutlinedTextField(
                 value = commandInput,
                 onValueChange = { commandInput = it },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 label = { Text("指令输入") },
-                placeholder = { Text("按下回车或发送键发送") },
+                placeholder = { Text("按下回车发送") },
                 textStyle = TextStyle(
                     fontSize = 14.sp,
                     fontFamily = FontFamily.Monospace
@@ -165,22 +164,6 @@ fun TerminalScreen() {
                     }
                 )
             )
-            
-            // 发送按钮
-            Button(
-                onClick = {
-                    if (commandInput.isNotBlank()) {
-                        TerminalSessionManager.executeCommand(commandInput)
-                        commandInput = ""
-                    }
-                },
-                modifier = Modifier.height(56.dp),
-                enabled = commandInput.isNotBlank() && !isRunning
-            ) {
-                Icon(Icons.Default.Send, contentDescription = "发送", modifier = Modifier.size(20.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("发送")
-            }
         }
     }
 }

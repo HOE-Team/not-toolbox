@@ -39,27 +39,59 @@ object TerminalSessionManager {
     private val _isRunning = MutableStateFlow(false)
     val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
     
+    private val _lastExitCode = MutableStateFlow<Int?>(null)
+    val lastExitCode: StateFlow<Int?> = _lastExitCode.asStateFlow()
+    
+    private val _wasCancelled = MutableStateFlow(false)
+    val wasCancelled: StateFlow<Boolean> = _wasCancelled.asStateFlow()
+    
     private var shellSessionJob: Job? = null
+    private var commandExecutionJob: Job? = null
+    
+    /**
+     * 当前使用的终端编码名称，默认为 "UTF-8"
+     */
+    private var currentEncodingName: String = "UTF-8"
+    
+    /**
+     * 设置终端编码
+     */
+    fun setEncoding(encodingName: String) {
+        currentEncodingName = encodingName
+    }
+    
+    /**
+     * 获取当前编码名称
+     */
+    fun getEncodingName(): String = currentEncodingName
+    
+    /**
+     * 获取当前编码的 Charset
+     */
+    private fun getCharset(): java.nio.charset.Charset {
+        return try {
+            java.nio.charset.Charset.forName(currentEncodingName)
+        } catch (_: Exception) {
+            java.nio.charset.Charset.forName("UTF-8")
+        }
+    }
+    
+    /**
+     * 根据编码名称获取对应的 Windows 代码页命令
+     */
+    private fun getCodePageCommand(): String {
+        return when (currentEncodingName.uppercase()) {
+            "GBK" -> "chcp 936 > nul && "
+            "UTF-16" -> "chcp 1200 > nul && "
+            else -> "chcp 65001 > nul && " // UTF-8
+        }
+    }
     
     /**
      * 获取当前操作系统名称
      */
     private val isWindows: Boolean by lazy {
         System.getProperty("os.name").lowercase().contains("windows")
-    }
-    
-    /**
-     * 获取 Windows 系统的代码页编码
-     * 中文 Windows 默认使用 GBK (Cp936)
-     */
-    private val windowsCharset: java.nio.charset.Charset by lazy {
-        try {
-            // 尝试获取系统默认编码
-            val encoding = System.getProperty("sun.jnu.encoding") ?: "GBK"
-            java.nio.charset.Charset.forName(encoding)
-        } catch (_: Exception) {
-            java.nio.charset.Charset.forName("GBK")
-        }
     }
     
     /**
@@ -81,12 +113,12 @@ object TerminalSessionManager {
             val process = processBuilder.start()
             
             currentProcess = process
-            // Windows 使用系统编码（GBK），其他平台使用 UTF-8
-            val processCharset = if (isWindows) windowsCharset else Charsets.UTF_8
+            // 使用用户设置的编码
+            val processCharset = getCharset()
             processWriter = OutputStreamWriter(process.outputStream, processCharset)
             _isRunning.value = true
             
-            addOutput("=== 终端会话已启动 ===\n")
+            addOutput("=== 终端会话已启动 ($currentEncodingName) ===\n")
             
             // 启动输出读取协程
             shellSessionJob = CoroutineScope(Dispatchers.IO).launch {
@@ -129,6 +161,7 @@ object TerminalSessionManager {
     
     /**
      * 执行命令（发送到交互式 Shell）
+     * 注意：此方法仅用于交互式终端，不适合需要等待命令完成的场景
      */
     fun executeCommand(command: String): Boolean {
         return try {
@@ -157,24 +190,106 @@ object TerminalSessionManager {
     }
     
     /**
+     * 执行命令并等待完成（直接启动进程，不通过交互式 Shell）
+     * 用于安装等需要等待命令执行完毕并获取退出码的场景
+     */
+    fun executeCommandAndWait(command: String) {
+        // 取消之前的执行任务
+        commandExecutionJob?.cancel()
+        
+        // 清空之前的输出和状态
+        clearOutput()
+        _wasCancelled.value = false
+        _lastExitCode.value = null
+        
+        commandExecutionJob = CoroutineScope(Dispatchers.IO).launch {
+            try {
+                _isRunning.value = true
+                
+                // 根据平台构建命令
+                val cmdArray = if (isWindows) {
+                    // Windows 上根据用户选择的编码设置控制台代码页
+                    arrayOf("cmd.exe", "/c", "${getCodePageCommand()}$command")
+                } else {
+                    arrayOf("sh", "-c", command)
+                }
+                
+                val processBuilder = ProcessBuilder(*cmdArray)
+                processBuilder.redirectErrorStream(true)
+                val process = processBuilder.start()
+                currentProcess = process
+                
+                // 使用用户设置的编码读取输出
+                val processCharset = getCharset()
+                val reader = BufferedReader(InputStreamReader(process.inputStream, processCharset))
+                
+                try {
+                    val buffer = CharArray(4096)
+                    var charsRead: Int
+                    while (isActive && process.isAlive) {
+                        charsRead = reader.read(buffer, 0, buffer.size)
+                        if (charsRead > 0) {
+                            val text = String(buffer, 0, charsRead)
+                            addOutput(text)
+                        } else if (charsRead == -1) {
+                            break
+                        }
+                    }
+                } catch (e: IOException) {
+                    if (isActive) {
+                        addOutput("\n[输出读取结束]\n")
+                    }
+                } finally {
+                    reader.close()
+                }
+                
+                // 等待进程结束
+                val exitCode = process.waitFor()
+                _lastExitCode.value = exitCode
+                addOutput("\n=== 进程已结束，退出码: $exitCode ===\n")
+                
+            } catch (e: Exception) {
+                addOutput("执行命令时出错: ${e.message}\n")
+                _lastExitCode.value = -1
+            } finally {
+                _isRunning.value = false
+                currentProcess = null
+                processWriter = null
+            }
+        }
+    }
+    
+    /**
      * 停止当前进程
+     * 使用 taskkill（Windows）或 pkill（Linux）直接终止进程
      */
     fun stopCurrentProcess() {
-        processWriter?.let { writer ->
-            try {
-                // 发送 Ctrl+C 信号
-                writer.write("\u0003")
-                writer.flush()
-                addOutput("\n^C\n")
-            } catch (_: Exception) { }
-        }
+        _wasCancelled.value = true
         
-        // 如果进程仍在运行，强制终止
+        // 取消执行任务
+        commandExecutionJob?.cancel()
+        
+        // 如果进程仍在运行，使用平台原生方式终止
         currentProcess?.let { process ->
             if (process.isAlive) {
                 try {
-                    process.destroy()
-                    Thread.sleep(100)
+                    // 先尝试获取进程 PID 并使用 taskkill/pkill
+                    val pid = process.pid()
+                    if (pid > 0) {
+                        try {
+                            if (isWindows) {
+                                // Windows: 使用 taskkill /F 强制终止进程树
+                                Runtime.getRuntime().exec(arrayOf("taskkill", "/F", "/T", "/PID", pid.toString()))
+                            } else {
+                                // Linux: 使用 kill -9 强制终止
+                                Runtime.getRuntime().exec(arrayOf("kill", "-9", pid.toString()))
+                            }
+                            addOutput("\n正在终止进程 (PID: $pid)...\n")
+                        } catch (_: Exception) { }
+                    }
+                    
+                    // 等待进程结束
+                    Thread.sleep(500)
                     if (process.isAlive) {
                         process.destroyForcibly()
                     }

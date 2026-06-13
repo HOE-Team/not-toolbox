@@ -11,11 +11,25 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 
+/**
+ * 终端编码选项
+ */
+enum class TerminalEncoding(val displayName: String, val charsetName: String) {
+    ANSI_GBK("GBK", "GBK"),
+    UTF8("UTF-8", "UTF-8"),
+    UTF16("UTF-16", "UTF-16");
+
+    companion object {
+        fun fromName(name: String): TerminalEncoding = entries.find { it.charsetName == name } ?: UTF8
+    }
+}
+
 data class AppConfig(
     val dark: Boolean = false, 
     val color: String? = null, 
     val useProxy: Boolean = false,
-    val proxyUrl: String = "https://gh-proxy.com"
+    val proxyUrl: String = "https://gh-proxy.com",
+    val terminalEncoding: String = "UTF-8"
 )
 
 private val configPath: Path = Path.of("config", "conf.toml")
@@ -28,6 +42,7 @@ fun loadConfig(): AppConfig {
         var color: String? = null
         var useProxy: Boolean = false
         var proxyUrl: String = "https://gh-proxy.com"
+        var terminalEncoding: String = "UTF-8"
         for (raw in lines) {
             val line = raw.trim()
             if (line.startsWith("#") || line.isEmpty()) continue
@@ -55,9 +70,16 @@ fun loadConfig(): AppConfig {
                     if (v.startsWith("\"") && v.endsWith("\"")) v = v.substring(1, v.length - 1)
                     if (v.isNotBlank()) proxyUrl = v
                 }
+            } else if (line.startsWith("terminal_encoding")) {
+                val parts = line.split('=', limit = 2)
+                if (parts.size == 2) {
+                    var v = parts[1].trim()
+                    if (v.startsWith("\"") && v.endsWith("\"")) v = v.substring(1, v.length - 1)
+                    if (v.isNotBlank()) terminalEncoding = v
+                }
             }
         }
-        AppConfig(dark = dark, color = color, useProxy = useProxy, proxyUrl = proxyUrl)
+        AppConfig(dark = dark, color = color, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding)
     } catch (e: Exception) {
         AppConfig()
     }
@@ -80,6 +102,7 @@ fun saveConfig(cfg: AppConfig) {
         sb.append('\n')
         sb.append("use_proxy = ").append(if (cfg.useProxy) "true" else "false").append('\n')
         sb.append("proxy_url = \"").append(cfg.proxyUrl).append("\"\n")
+        sb.append("terminal_encoding = \"").append(cfg.terminalEncoding).append("\"\n")
         Files.writeString(tmp, sb.toString())
         Files.move(tmp, configPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
     } catch (e: Exception) {

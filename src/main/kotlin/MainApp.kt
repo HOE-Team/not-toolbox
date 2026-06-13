@@ -31,6 +31,7 @@ import androidx.compose.ui.window.WindowState
 import java.awt.Dimension
 import utils.PackageManagerType
 import utils.PackageManagerUtils
+import utils.TerminalSessionManager
 
 // 编译时常量：true=启用本地DEBUG包列表，false=从远程拉取
 const val IS_DEBUG = false
@@ -61,6 +62,11 @@ fun main() = application {
         var proxyUrl by remember { mutableStateOf(loaded.proxyUrl) }
         // 包管理器选择状态（默认自动检测）
         var selectedPackageManager by remember { mutableStateOf(PackageManagerUtils.detectPackageManager()) }
+        // 终端编码设置
+        var terminalEncoding by remember { mutableStateOf(loaded.terminalEncoding) }
+        
+        // 初始化 TerminalSessionManager 的编码
+        TerminalSessionManager.setEncoding(terminalEncoding)
 
         AppTheme(darkTheme = isDark, seedHex = seedHex) {
             AppScaffold(
@@ -79,24 +85,30 @@ fun main() = application {
                         isDarkTheme = isDark,
                         onThemeChange = { newDark ->
                             isDark = newDark
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl))
+                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding))
                         },
                         selectedColor = seedHex ?: "",
                         onColorChange = { hex ->
                             seedHex = if (hex.isBlank()) null else hex
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl))
+                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding))
                         },
                         selectedPackageManager = selectedPackageManager,
                         onPackageManagerChange = { selectedPackageManager = it },
                         useProxy = useProxy,
                         onUseProxyChange = { newUseProxy ->
                             useProxy = newUseProxy
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl))
+                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding))
                         },
                         proxyUrl = proxyUrl,
                         onProxyUrlChange = { newProxyUrl ->
                             proxyUrl = newProxyUrl
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl))
+                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding))
+                        },
+                        terminalEncoding = terminalEncoding,
+                        onTerminalEncodingChange = { newEncoding ->
+                            terminalEncoding = newEncoding
+                            TerminalSessionManager.setEncoding(newEncoding)
+                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = newEncoding))
                         }
                     )
                     4 -> AboutScreen()

@@ -174,6 +174,10 @@ not-toolbox/
 // 编译时常量：true=启用本地DEBUG包列表，false=从远程拉取
 const val IS_DEBUG = false
 ```
+
+### Packages Lists JSON RAW 源仓库
+请参见 [HOE-Team/not-toolbox-resource](https://github.com/HOE-Team/not-toolbox-resource)
+
 ---
 
 > [!NOTE]

@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import utils.PackageManagerUtils
 import utils.PackageManagerType
+import config.TerminalEncoding
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,7 +43,9 @@ fun SettingsScreen(
     useProxy: Boolean = false,
     onUseProxyChange: (Boolean) -> Unit = {},
     proxyUrl: String = "https://ghproxy.net",
-    onProxyUrlChange: (String) -> Unit = {}
+    onProxyUrlChange: (String) -> Unit = {},
+    terminalEncoding: String = "UTF-8",
+    onTerminalEncodingChange: (String) -> Unit = {}
 ) {
     var localDarkTheme by remember { mutableStateOf(isDarkTheme) }
     var hexInput by remember { mutableStateOf(selectedColor) }
@@ -358,6 +361,82 @@ fun SettingsScreen(
         }
 
         Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+        // 终端编码设置
+        Text(
+            text = "终端编码",
+            style = MaterialTheme.typography.titleMedium,
+            fontSize = 14.sp,
+            modifier = Modifier.padding(vertical = 12.dp)
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Column {
+                    Text(
+                        text = "终端输出编码",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = "选择终端输出使用的字符编码",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // 编码选择下拉菜单
+            var encodingExpanded by remember { mutableStateOf(false) }
+            val currentEncoding = remember(terminalEncoding) {
+                TerminalEncoding.fromName(terminalEncoding)
+            }
+            ExposedDropdownMenuBox(
+                expanded = encodingExpanded,
+                onExpandedChange = { encodingExpanded = !encodingExpanded },
+                modifier = Modifier.width(200.dp)
+            ) {
+                TextField(
+                    value = currentEncoding.displayName,
+                    onValueChange = {},
+                    readOnly = true,
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = encodingExpanded) },
+                    colors = ExposedDropdownMenuDefaults.textFieldColors(),
+                    modifier = Modifier.menuAnchor()
+                )
+                
+                ExposedDropdownMenu(
+                    expanded = encodingExpanded,
+                    onDismissRequest = { encodingExpanded = false }
+                ) {
+                    TerminalEncoding.entries.forEach { encoding ->
+                        DropdownMenuItem(
+                            text = { 
+                                Text(
+                                    text = encoding.displayName,
+                                    color = if (encoding.charsetName == terminalEncoding)
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.onSurface
+                                )
+                            },
+                            onClick = {
+                                onTerminalEncodingChange(encoding.charsetName)
+                                encodingExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
 
         Spacer(modifier = Modifier.height(12.dp))
     }

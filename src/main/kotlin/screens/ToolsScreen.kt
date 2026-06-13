@@ -22,6 +22,8 @@ import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.SyncDisabled
 import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -254,6 +256,18 @@ fun ToolCard(tool: PackageInfo, selectedPackageManager: PackageManagerType = Pac
         }
     }
     
+    // 安装按钮
+    val installCommand = remember(packageName, packageManager) {
+        if (packageName != null && packageManager != PackageManagerType.UNKNOWN) {
+            PackageManagerUtils.getInstallCommand(packageManager, packageName)
+        } else {
+            null
+        }
+    }
+    
+    // 安装流程状态（在 Card 外部定义，以便在 Card 外部渲染对话框）
+    var installDialogState by remember { mutableStateOf<InstallDialogState?>(null) }
+    
     Card(
         modifier = modifier
             .height(240.dp), // 增加高度以容纳许可证信息和双按钮
@@ -354,15 +368,6 @@ fun ToolCard(tool: PackageInfo, selectedPackageManager: PackageManagerType = Pac
             
             Spacer(modifier = Modifier.weight(1f))
             
-            // 安装按钮
-            val installCommand = remember(packageName, packageManager) {
-                if (packageName != null && packageManager != PackageManagerType.UNKNOWN) {
-                    PackageManagerUtils.getInstallCommand(packageManager, packageName)
-                } else {
-                    null
-                }
-            }
-            
             // 双按钮行：安装 + 查看许可证/用户协议
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -370,29 +375,14 @@ fun ToolCard(tool: PackageInfo, selectedPackageManager: PackageManagerType = Pac
             ) {
                 // 安装按钮
                 if (installCommand != null) {
-                    var showInstallDialog by remember { mutableStateOf(false) }
-                    
                     Button(
-                        onClick = { showInstallDialog = true },
+                        onClick = { installDialogState = InstallDialogState.CONFIRM },
                         modifier = Modifier.weight(1f),
                         enabled = packageManager != PackageManagerType.UNKNOWN
                     ) {
                         Icon(Icons.Default.Download, contentDescription = "安装", modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("安装", fontSize = 12.sp)
-                    }
-                    
-                    // 安装确认对话框
-                    if (showInstallDialog) {
-                        InstallConfirmationDialog(
-                            toolName = tool.name,
-                            installCommand = installCommand,
-                            onDismiss = { showInstallDialog = false },
-                            onConfirm = {
-                                TerminalSessionManager.executeCommand(installCommand)
-                                showInstallDialog = false
-                            }
-                        )
                     }
                 } else {
                     // 没有安装命令时，显示占位按钮（禁用状态）
@@ -427,6 +417,19 @@ fun ToolCard(tool: PackageInfo, selectedPackageManager: PackageManagerType = Pac
             }
         }
     }
+    
+    // 安装流程对话框（在 Card 外部渲染，避免被 Card 裁剪）
+    // InstallConfirmationDialog 内部使用 when 表达式管理三个状态：CONFIRM → PROGRESS → RESULT
+    if (installDialogState == InstallDialogState.CONFIRM) {
+        InstallConfirmationDialog(
+            toolName = tool.name,
+            installCommand = installCommand ?: "",
+            onDismiss = { installDialogState = null },
+            onConfirm = {
+                TerminalSessionManager.executeCommandAndWait(installCommand ?: "")
+            }
+        )
+    }
 }
 
 private fun getDefaultLicenseUrl(toolUrl: String?): String? {
@@ -460,7 +463,17 @@ private fun openToolWebsite(url: String) {
 }
 
 /**
+ * 安装流程对话框状态
+ */
+private enum class InstallDialogState {
+    CONFIRM,    // 确认安装
+    PROGRESS,   // 安装进度
+    RESULT      // 安装结果
+}
+
+/**
  * 安装确认对话框
+ * 点击"确认安装"后打开安装进度对话框（dialog1），安装完成后跳转到结果对话框（dialog2）
  */
 @Composable
 fun InstallConfirmationDialog(
@@ -469,164 +482,224 @@ fun InstallConfirmationDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
-    var showOutputDialog by remember { mutableStateOf(false) }
+    var dialogState by remember { mutableStateOf(InstallDialogState.CONFIRM) }
+    var installSuccess by remember { mutableStateOf(false) }
     
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("确认安装") },
-        text = { 
-            Column {
-                Text("将执行以下命令安装 $toolName:")
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = installCommand,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .background(
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                            shape = RoundedCornerShape(4.dp)
+    when (dialogState) {
+        InstallDialogState.CONFIRM -> {
+            AlertDialog(
+                onDismissRequest = onDismiss,
+                title = { Text("确认安装") },
+                text = { 
+                    Column {
+                        Text("将执行以下命令安装 $toolName:")
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = installCommand,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .background(
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                    shape = RoundedCornerShape(4.dp)
+                                )
+                                .padding(8.dp)
                         )
-                        .padding(8.dp)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "注意：这需要管理员权限，可能会要求输入密码。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    onConfirm()
-                    showOutputDialog = true
-                }
-            ) {
-                Text("确认安装")
-            }
-        },
-        dismissButton = {
-            OutlinedButton(
-                onClick = onDismiss
-            ) {
-                Text("取消")
-            }
-        }
-    )
-    
-    // 输出对话框
-    if (showOutputDialog) {
-        OutputDialog(
-            onDismiss = {
-                showOutputDialog = false
-                onDismiss()
-            }
-        )
-    }
-}
-
-/**
- * 输出对话框，显示终端实时输出
- */
-@Composable
-fun OutputDialog(
-    onDismiss: () -> Unit
-) {
-    var terminalOutput by remember { mutableStateOf("") }
-    var isRunning by remember { mutableStateOf(false) }
-    
-    // Collect flow updates
-    LaunchedEffect(Unit) {
-        TerminalSessionManager.outputFlow.collect { output ->
-            terminalOutput = output
-        }
-    }
-    
-    LaunchedEffect(Unit) {
-        TerminalSessionManager.isRunning.collect { running ->
-            isRunning = running
-        }
-    }
-    
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("输出") },
-        text = { 
-            Column {
-                // 输出显示区域
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(300.dp)
-                        .background(
-                            color = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.9f),
-                            shape = RoundedCornerShape(4.dp)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "注意：这需要管理员权限，可能会要求输入密码。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
                         )
-                        .padding(8.dp)
-                ) {
-                    val scrollState = rememberScrollState()
-                    
-                    LaunchedEffect(terminalOutput) {
-                        scrollState.animateScrollTo(scrollState.maxValue)
                     }
-                    
-                    Text(
-                        text = terminalOutput,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(scrollState),
-                        style = androidx.compose.ui.text.TextStyle(
-                            color = androidx.compose.ui.graphics.Color.Green,
-                            fontSize = 10.sp,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                        ),
-                        maxLines = Int.MAX_VALUE
-                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            onConfirm()
+                            dialogState = InstallDialogState.PROGRESS
+                        }
+                    ) {
+                        Text("确认安装")
+                    }
+                },
+                dismissButton = {
+                    OutlinedButton(
+                        onClick = onDismiss
+                    ) {
+                        Text("取消")
+                    }
                 }
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                // 状态提示
-                if (isRunning) {
-                    Text(
-                        text = "安装正在进行中...",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                } else {
-                    Text(
-                        text = "安装已完成。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            if (isRunning) {
-                // 如果进程正在运行，显示"取消"按钮（发送Ctrl+C）
-                OutlinedButton(
-                    onClick = {
-                        TerminalSessionManager.stopCurrentProcess()
-                    },
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Icon(Icons.Default.Close, contentDescription = "取消", modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("取消 (Ctrl+C)")
-                }
-            } else {
-                // 如果进程已完成，显示"关闭"按钮
-                Button(
-                    onClick = onDismiss
-                ) {
-                    Text("关闭")
-                }
-            }
+            )
         }
-    )
+        
+        InstallDialogState.PROGRESS -> {
+            // dialog1: 安装进度对话框
+            var terminalOutput by remember { mutableStateOf("") }
+            var isRunning by remember { mutableStateOf(false) }
+            
+            // Collect flow updates
+            LaunchedEffect(Unit) {
+                TerminalSessionManager.outputFlow.collect { output ->
+                    terminalOutput = output
+                }
+            }
+            
+            LaunchedEffect(Unit) {
+                TerminalSessionManager.isRunning.collect { running ->
+                    isRunning = running
+                    // 当进程从运行变为停止时，安装完成
+                    if (!running) {
+                        // 检查是否被取消
+                        val cancelled = TerminalSessionManager.wasCancelled.value
+                        if (cancelled) {
+                            installSuccess = false
+                        } else {
+                            // 检查退出码
+                            val exitCode = TerminalSessionManager.lastExitCode.value
+                            installSuccess = exitCode != null && exitCode == 0
+                        }
+                        dialogState = InstallDialogState.RESULT
+                    }
+                }
+            }
+            
+            AlertDialog(
+                onDismissRequest = { /* 安装中不允许关闭 */ },
+                title = { Text("正在安装") },
+                text = { 
+                    Column {
+                        // 日志输出区域
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(300.dp)
+                                .background(
+                                    color = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.9f),
+                                    shape = RoundedCornerShape(4.dp)
+                                )
+                                .padding(8.dp)
+                        ) {
+                            val scrollState = rememberScrollState()
+                            
+                            LaunchedEffect(terminalOutput) {
+                                scrollState.animateScrollTo(scrollState.maxValue)
+                            }
+                            
+                            Text(
+                                text = terminalOutput,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .verticalScroll(scrollState),
+                                style = androidx.compose.ui.text.TextStyle(
+                                    color = androidx.compose.ui.graphics.Color.LightGray,
+                                    fontSize = 10.sp,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                ),
+                                maxLines = Int.MAX_VALUE
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        // 状态提示
+                        if (isRunning) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp
+                                )
+                                Text(
+                                    text = "正在安装 $toolName...",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        } else {
+                            Text(
+                                text = "安装已完成。",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    // 安装中显示"取消"按钮
+                    if (isRunning) {
+                        OutlinedButton(
+                            onClick = {
+                                TerminalSessionManager.stopCurrentProcess()
+                            },
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "取消", modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("取消")
+                        }
+                    }
+                }
+            )
+        }
+        
+        InstallDialogState.RESULT -> {
+            // dialog2: 安装结果对话框
+            AlertDialog(
+                onDismissRequest = onDismiss,
+                title = { 
+                    Text(
+                        text = if (installSuccess) "安装成功！" else "安装失败",
+                        style = MaterialTheme.typography.titleLarge
+                    ) 
+                },
+                text = { 
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        if (installSuccess) {
+                            // 成功图标
+                            Icon(
+                                imageVector = Icons.Default.AutoAwesome,
+                                contentDescription = "安装成功",
+                                modifier = Modifier.size(64.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "已成功安装 $toolName",
+                                style = MaterialTheme.typography.bodyLarge,
+                                textAlign = TextAlign.Center
+                            )
+                        } else {
+                            // 失败图标
+                            Icon(
+                                imageVector = Icons.Default.Error,
+                                contentDescription = "安装失败",
+                                modifier = Modifier.size(64.dp),
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                            Text(
+                                text = "无法安装 $toolName，详情请查看\"终端\"页面输出",
+                                style = MaterialTheme.typography.bodyLarge,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = onDismiss
+                    ) {
+                        Text("完成")
+                    }
+                }
+            )
+        }
+    }
 }
