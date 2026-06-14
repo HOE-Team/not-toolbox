@@ -3,3 +3,6 @@ pyi
 
 # Inno Setup
 installer
+
+# TAR
+*.tar.gz
