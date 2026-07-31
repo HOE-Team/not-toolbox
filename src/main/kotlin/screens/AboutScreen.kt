@@ -46,7 +46,7 @@ fun AboutScreen() {
         )
         Spacer(modifier = Modifier.height(24.dp))
         Text(
-            text = "一款跨平台、功能强大、去本地化的工具箱",
+            text = "一款跨平台、功能强大、去本地化的工具集",
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Start
         )
@@ -67,7 +67,7 @@ fun AboutScreen() {
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "版本：N-1.0.0",
+            text = "版本：N-1.0.1",
             style = MaterialTheme.typography.bodyMedium
         )
 

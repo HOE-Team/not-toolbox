@@ -9,3 +9,7 @@ installer
 
 # IntelliJ IDEA
 .idea
+
+# Others
+Get-Hash.bat
+Get-Exe-Hash.bat
