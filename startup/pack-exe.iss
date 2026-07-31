@@ -4,10 +4,10 @@
 [Setup]
 AppId={{3189BC08-A081-436D-B344-A535CD722811}}
 AppName=NOT Toolbox
-AppVersion=1.0.0
+AppVersion=1.0.1
 AppPublisher=HOE Team
 AppPublisherURL=https://hoe-team.github.io
-AppSupportURL=https://hoe-team.github.io/contact-us.html
+AppSupportURL=https://hoe-team.xyz/contact-us.html
 AppUpdatesURL=https://github.com/HOE-Team/not-toolbox/releases
 DefaultDirName={autopf}\NOT Toolbox
 DefaultGroupName=NOT Toolbox
