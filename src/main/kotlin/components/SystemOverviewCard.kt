@@ -69,14 +69,20 @@ fun SystemOverviewCard(
                 )
             }
 
-            // Left (transparent) -> Right (opaque) overlay
+            // Left (opaque) -> Right (transparent) overlay.
+            // Text sits on the left, so the left side is more opaque for readability,
+            // while the right side is more transparent to keep the wallpaper visible.
+            // matchParentSize: measured last, matches the parent Box's final size
+            // (fillMaxSize in a wrapContentHeight Box can resolve incorrectly).
             Box(modifier = Modifier
-                .fillMaxSize()
+                .matchParentSize()
                 .background(
                     Brush.horizontalGradient(
                         colors = listOf(
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.0f),
-                            MaterialTheme.colorScheme.surface.copy(alpha = 1.0f)
+                            MaterialTheme.colorScheme.surface.copy(alpha = 1.0f),
+                            MaterialTheme.colorScheme.surface.copy(alpha = 0.75f),
+                            MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+                            MaterialTheme.colorScheme.surface.copy(alpha = 0.2f)
                         )
                     )
                 )

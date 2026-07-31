@@ -38,21 +38,100 @@ fun adjustLuminance(color: Color, factor: Float): Color {
     return Color(r, g, b, color.alpha)
 }
 
+// HSL conversion helpers for Material 3 "tone" mapping.
+// A color role keeps its hue & chroma but is placed on a different tone
+// (lightness) per theme: dark themes lighten accents (Tone 80) and darken
+// containers (Tone 30), mirroring light themes' Tone 40 / Tone 90.
+private data class HSL(val hue: Float, val sat: Float, val light: Float)
+
+private fun Color.toHsl(): HSL {
+    val r = red
+    val g = green
+    val b = blue
+    val max = maxOf(r, g, b)
+    val min = minOf(r, g, b)
+    val l = (max + min) / 2f
+    val d = max - min
+    val s = if (max == min) 0f else if (l > 0.5f) d / (2f - max - min) else d / (max + min)
+    val h = when {
+        max == min -> 0f
+        max == r -> (g - b) / d + (if (g < b) 6f else 0f)
+        max == g -> (b - r) / d + 2f
+        else -> (r - g) / d + 4f
+    } * (1f / 6f)
+    return HSL(h.coerceIn(0f, 1f), s.coerceIn(0f, 1f), l.coerceIn(0f, 1f))
+}
+
+private fun hslToColor(hue: Float, sat: Float, light: Float, alpha: Float): Color {
+    val c = (1f - kotlin.math.abs(2f * light - 1f)) * sat
+    val hp = hue * 6f
+    val x = c * (1f - kotlin.math.abs(hp % 2f - 1f))
+    val (r1, g1, b1) = when {
+        hp < 1f -> Triple(c, x, 0f)
+        hp < 2f -> Triple(x, c, 0f)
+        hp < 3f -> Triple(0f, c, x)
+        hp < 4f -> Triple(0f, x, c)
+        hp < 5f -> Triple(x, 0f, c)
+        else -> Triple(c, 0f, x)
+    }
+    val m = light - c / 2f
+    return Color(r1 + m, g1 + m, b1 + m, alpha)
+}
+
+/** Re-color the given color onto the requested Material 3 tone (0-100), keeping its hue & chroma. */
+fun toneOf(color: Color, tone: Float): Color {
+    val hsl = color.toHsl()
+    return hslToColor(hsl.hue, hsl.sat, (tone / 100f).coerceIn(0f, 1f), color.alpha)
+}
+
 fun contrastColor(color: Color): Color {
     val lum = 0.2126f * color.red + 0.7152f * color.green + 0.0722f * color.blue
     return if (lum < 0.5f) Color(0xFFFFFFFF) else Color(0xFF000000)
 }
 
 fun generateColorScheme(seed: Color, dark: Boolean) = if (dark) {
-    darkColorScheme(
-        primary = seed,
-        onPrimary = contrastColor(seed),
-        secondary = adjustLuminance(seed, 0.85f),
-        onSecondary = contrastColor(adjustLuminance(seed, 0.85f)),
-        background = Color(0xFF121212),
-        onBackground = Color(0xFFFFFFFF),
-        surface = Color(0xFF1E1E1E),
-        onSurface = Color(0xFFFFFFFF)
+    // Material 3 dark scheme via tone mapping: the same color roles keep their
+    // hue & chroma but move to different tones than light mode. Accents go to
+    // Tone 80 (lighter, for contrast on dark surfaces), containers drop to
+    // Tone 30 (darker), and text on containers goes to Tone 90.
+    val primaryTone80 = toneOf(seed, 80f)
+    val primaryContainerTone30 = toneOf(seed, 30f)
+    val secondaryTone80 = toneOf(seed, 80f)
+    val secondaryContainerTone30 = toneOf(seed, 30f)
+    val tertiaryTone80 = toneOf(seed, 80f)
+    val tertiaryContainerTone30 = toneOf(seed, 30f)
+
+    darkColorScheme().copy(
+        primary = primaryTone80,
+        // Tone-80 accents are light; on-colors use tone-20 in the same hue
+        // (e.g. deep purple on light purple) instead of a stark pure black,
+        // matching M3 on-color contrast (see #D0BCFF / #371E73).
+        onPrimary = toneOf(seed, 20f),
+        primaryContainer = primaryContainerTone30,
+        onPrimaryContainer = toneOf(seed, 90f),
+        secondary = secondaryTone80,
+        onSecondary = toneOf(seed, 20f),
+        secondaryContainer = secondaryContainerTone30,
+        onSecondaryContainer = toneOf(seed, 90f),
+        tertiary = tertiaryTone80,
+        onTertiary = toneOf(seed, 20f),
+        tertiaryContainer = tertiaryContainerTone30,
+        onTertiaryContainer = toneOf(seed, 90f),
+        background = Color(0xFF141218),
+        onBackground = Color(0xFFE6E1E5),
+        surface = Color(0xFF1D1B20),
+        onSurface = Color(0xFFE6E1E5),
+        surfaceVariant = Color(0xFF49454F),
+        onSurfaceVariant = Color(0xFFCAC4D0),
+        outline = Color(0xFF938F99),
+        outlineVariant = Color(0xFF49454F),
+        inverseSurface = Color(0xFFE6E1E5),
+        inverseOnSurface = Color(0xFF322F35),
+        inversePrimary = seed,
+        error = Color(0xFFF2B8B5),
+        onError = Color(0xFF601410),
+        errorContainer = Color(0xFF8C1D18),
+        onErrorContainer = Color(0xFFF9DEDC)
     )
 } else {
     lightColorScheme(

@@ -29,7 +29,6 @@ replay_pid*
 # Others
 /build
 /.gradle
-*.sh
 
 # IDEA
 /.idea

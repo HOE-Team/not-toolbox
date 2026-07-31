@@ -51,7 +51,7 @@ Windows 10 1507+（内部版本 10240），需要至少存在一种包管理器�
 * **权限**：Linux平台上部分功能（如包管理器安装）需要sudo权限，在Windows需要用户同意UAC（由包管理器发起，NOT Toolbox程序不提升权限）
 
 ## 🚀 安装和运行
-### 方法1：使用启动器(Windows)或启动脚本(Linux)
+### 使用启动器(Windows)或启动脚本(Linux)
 **Windows**
 1. 从 [Releases](https://github.com/HOE-Team/not-toolbox/releases) 下载`NTB.exe`
 2. 运行并安装
@@ -70,7 +70,7 @@ Windows 10 1507+（内部版本 10240），需要至少存在一种包管理器�
    sh linux-startup.sh
    ```
 
-### 方法2：直接运行JAR文件
+### 通过java -jar运行JAR文件
 1. 确保已安装Java 21或更高版本
 2. 从本项目的 [Releases](https://github.com/HOE-Team/not-toolbox/releases) 页面下载 `NTB-all.jar`
 3. 运行应用程序：
@@ -78,7 +78,7 @@ Windows 10 1507+（内部版本 10240），需要至少存在一种包管理器�
    java -jar NTB-all.jar
    ```
 
-### 方法3：从源代码构建
+### 从源代码构建
 ```bash
 # 克隆仓库
 git clone https://github.com/HOE-Team/not-toolbox.git
@@ -169,7 +169,6 @@ not-toolbox/
 │   └── pyi                  # 打包操作目录
 ├── src/main/resources/      # 资源文件
 ├── build.gradle.kts         # Gradle构建配置
-├── run.sh                   # Linux启动脚本
 └── README.md                # 项目说明
 ```
 

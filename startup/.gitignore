@@ -6,3 +6,6 @@ installer
 
 # TAR
 *.tar.gz
+
+# IntelliJ IDEA
+.idea

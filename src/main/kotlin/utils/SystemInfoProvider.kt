@@ -159,6 +159,138 @@ object SystemInfoProvider {
     // Cache previous CPU ticks for non-blocking load calculation
     private var prevCpuTicks: LongArray? = null
 
+    // Network IO tracking (raw bytes + timestamp for rate calculation)
+    @Volatile
+    private var prevNetRxBytes = 0L
+    @Volatile
+    private var prevNetTxBytes = 0L
+    @Volatile
+    private var prevNetSampleNanos = 0L
+
+    // WiFi SSID + IPv4 detection (cached, refreshed periodically to avoid blocking subprocesses every second)
+    @Volatile
+    private var cachedSSID: String? = null
+    @Volatile
+    private var cachedIPv4: String? = null
+    @Volatile
+    private var cachedNICName: String? = null
+    @Volatile
+    private var cachedMAC: String? = null
+    private var wifiLastRefreshNanos = 0L
+    private val WIFI_REFRESH_INTERVAL_NANOS = 10_000_000_000L  // every 10s
+
+    private fun refreshWifiSsid() {
+        val os = System.getProperty("os.name").lowercase()
+        try {
+            val ssid = if (os.contains("windows")) {
+                val out = executeCommand("netsh wlan show interfaces")
+                out.lines()
+                    .firstOrNull { it.contains("SSID", ignoreCase = true) && !it.contains("BSSID", ignoreCase = true) }
+                    ?.split(":")
+                    ?.getOrNull(1)
+                    ?.trim()
+                    ?.ifBlank { null }
+            } else if (os.contains("linux")) {
+                val out = executeCommand("iwgetid -r 2>/dev/null")
+                out.lines().firstOrNull { it.isNotBlank() }?.trim()?.ifBlank { null }
+            } else if (os.contains("mac")) {
+                val out = executeCommand("networksetup -getairportnetwork en0 2>/dev/null")
+                out.lines().firstOrNull { it.contains("SSID", ignoreCase = true) }
+                    ?.substringAfter(":")
+                    ?.trim()
+                    ?.ifBlank { null }
+            } else null
+            cachedSSID = ssid
+        } catch (_: Exception) {
+            cachedSSID = null
+        }
+    }
+
+    private fun refreshNetworkIdentity() {
+        try {
+            var ip: String? = null
+            var nicName: String? = null
+            var mac: String? = null
+            // Use the standard JDK API (robust across OSHI versions)
+            val interfaces = java.net.NetworkInterface.getNetworkInterfaces()
+            if (interfaces != null) {
+                for (nif in interfaces) {
+                    if (!nif.isUp || nif.isLoopback) continue
+                    val addrs = nif.inetAddresses
+                    var hasIpv4 = false
+                    for (addr in addrs) {
+                        if (addr is java.net.Inet4Address && !addr.hostAddress.startsWith("169.254.")) {
+                            ip = addr.hostAddress
+                            hasIpv4 = true
+                            break
+                        }
+                    }
+                    if (hasIpv4) {
+                        nicName = nif.name
+                        val hw = try { nif.hardwareAddress } catch (_: Exception) { null }
+                        if (hw != null && hw.isNotEmpty()) {
+                            mac = hw.joinToString(":") { String.format("%02X", it) }
+                        }
+                        break
+                    }
+                }
+            }
+            cachedIPv4 = ip
+            cachedNICName = nicName
+            cachedMAC = mac
+        } catch (_: Exception) {
+            cachedIPv4 = null
+            cachedNICName = null
+            cachedMAC = null
+        }
+    }
+
+    fun getNetworkIO(): NetworkIOInfo {
+        val now = System.nanoTime()
+
+        // Periodically refresh WiFi SSID / IPv4 without blocking every second
+        if (now - wifiLastRefreshNanos > WIFI_REFRESH_INTERVAL_NANOS) {
+            refreshWifiSsid()
+            refreshNetworkIdentity()
+            wifiLastRefreshNanos = now
+        }
+
+        // Accumulate raw counters across all interfaces
+        var rx = 0L
+        var tx = 0L
+        try {
+            for (net in hardware.networkIFs) {
+                rx += net.bytesRecv
+                tx += net.bytesSent
+            }
+        } catch (_: Exception) {
+        }
+
+        var downKBps = 0.0
+        var upKBps = 0.0
+        val elapsedNanos = now - prevNetSampleNanos
+        if (prevNetSampleNanos != 0L && elapsedNanos > 0L && rx >= prevNetRxBytes && tx >= prevNetTxBytes) {
+            val elapsedSec = elapsedNanos / 1_000_000_000.0
+            downKBps = ((rx - prevNetRxBytes) / 1024.0) / elapsedSec
+            upKBps = ((tx - prevNetTxBytes) / 1024.0) / elapsedSec
+        }
+
+        prevNetSampleNanos = now
+        prevNetRxBytes = rx
+        prevNetTxBytes = tx
+
+        return NetworkIOInfo(
+            downKBps = downKBps,
+            upKBps = upKBps,
+            downTotalGB = rx / (1024.0 * 1024.0 * 1024.0),
+            upTotalGB = tx / (1024.0 * 1024.0 * 1024.0),
+            ssid = cachedSSID,
+            ipv4 = cachedIPv4,
+            nicName = cachedNICName,
+            mac = cachedMAC
+        )
+    }
+
     fun getSystemInfo(): SystemInfoSnapshot {
         // CPU
         val processor = hardware.processor

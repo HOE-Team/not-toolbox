@@ -102,7 +102,15 @@ fun SettingsScreen(
                 onCheckedChange = { newValue ->
                     localDarkTheme = newValue
                     onThemeChange(newValue)
-                }
+                },
+                // M3 switch colors: on = primary track / onPrimary thumb,
+                // off = surfaceVariant track / onSurfaceVariant thumb.
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                    checkedTrackColor = MaterialTheme.colorScheme.primary,
+                    uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
             )
         }
 
@@ -320,7 +328,13 @@ fun SettingsScreen(
             }
             Switch(
                 checked = useProxy,
-                onCheckedChange = { onUseProxyChange(it) }
+                onCheckedChange = { onUseProxyChange(it) },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                    checkedTrackColor = MaterialTheme.colorScheme.primary,
+                    uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
             )
         }
 

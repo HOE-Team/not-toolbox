@@ -58,25 +58,66 @@ NTB Launcher 使用 [MIT License](../LICENSES/LICENSE-MIT-NTB-LAUNCHER-PACK-TOOL
 版权所有 ©2026 HOE Team。保留所有权利。
 
 ## Linux 平台启动脚本
+
+**功能**：  
+Linux 启动脚本（linux-startup.sh）会在启动时自动获取 sudo 权限，并检查 Java 环境（要求 Java 21 或更高版本），然后以 root 权限启动 NOT Toolbox，确保包管理器操作（如安装软件包）可以正常执行。
+
+**为什么不直接使用 `java -jar` 启动？**  
+由于 NOT Toolbox 在 Linux 平台上需要执行包管理器操作（如 apt、dnf、pacman 等），这些操作通常需要 root 权限。直接使用 `java -jar` 启动将无法进行需要权限的操作。
+
+**脚本内容**：
 ```bash
 #!/bin/bash
 
+# NOT Toolbox Linux 启动脚本
+# 此脚本会在启动时获取 sudo 权限，并将 Java 要求提升至 Java 21+
+
+# 检查 sudo 是否可用
+if ! command -v sudo &> /dev/null; then
+    echo -e "\033[31m错误\033[0m: 未找到 sudo 命令，请先安装 sudo 或使用 root 用户直接执行"
+    exit 1
+fi
+
+# 检查是否已是 root 用户
+if [ "$(id -u)" -eq 0 ]; then
+    echo -e "\033[32m提示\033[0m: 当前已是 root 用户，无需获取 sudo 权限"
+else
+    # 获取 sudo 权限（验证用户密码并缓存凭据）
+    echo -e "\033[33m提示\033[0m: NOT Toolbox 需要 sudo 权限以进行包管理器操作"
+    if sudo -v; then
+        echo -e "\033[32m成功\033[0m: 已获取 sudo 权限"
+    else
+        echo -e "\033[31m错误\033[0m: 未能获取 sudo 权限，无法继续启动"
+        exit 1
+    fi
+fi
+
+# Java 版本检查
+if ! command -v java &> /dev/null; then
+    echo -e "\033[31m错误\033[0m: 未找到 Java，需要安装 Java 21 或更高版本"
+    exit 1
+fi
+
 JAVA_VERSION=$(java -version 2>&1 | head -1 | cut -d'"' -f2 | sed 's/^1\.//' | cut -d'.' -f1)
 
-if ! command -v java &> /dev/null; then
-    echo -e "\033[31m错误\033[0m: 未找到 Java，需要安装 Java 11 或更高版本"
-    exit 1
-fi
-
-if [ "$JAVA_VERSION" -lt 11 ]; then
+if [ "$JAVA_VERSION" -lt 21 ]; then
     echo -e "\033[31m错误\033[0m: Java 版本太低 (当前: $JAVA_VERSION)"
-    echo -e "需要安装 Java 11 或更高版本"
+    echo -e "需要安装 Java 21 或更高版本"
     exit 1
 fi
 
-java -jar NTB-all.jar
+echo -e "\033[32m完成\033[0m: Java 版本检查通过 (Java $JAVA_VERSION)"
+
+# 使用 sudo 权限启动 NOT Toolbox
+exec sudo java -jar NTB-all.jar
 ```
-或直接在终端中键入
+
+**使用方式**：
 ```bash
-java -jar NTB-all.jar
+sh linux-startup.sh
 ```
+
+> [!WARNING]
+> 由于脚本会使用 sudo 启动程序，运行时会请求输入用户密码以获取权限。
+> 如果你的系统当前已是 root 用户，脚本会自动检测并跳过 sudo 验证步骤。
+> 如果你无法使用 sudo 权限，请考虑以 root 用户身份运行脚本。

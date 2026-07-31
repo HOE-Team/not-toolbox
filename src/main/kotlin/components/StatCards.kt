@@ -245,3 +245,87 @@ fun DiskStatCard(
         }
     )
 }
+
+/** Format a KB/s rate into a human-readable string (auto KB/s, MB/s, GB/s). */
+private fun formatRate(kbPerSec: Double): String {
+    return when {
+        kbPerSec >= 1024.0 * 1024.0 -> String.format(Locale.getDefault(), "%.2f GB/s", kbPerSec / (1024.0 * 1024.0))
+        kbPerSec >= 1024.0 -> String.format(Locale.getDefault(), "%.2f MB/s", kbPerSec / 1024.0)
+        else -> String.format(Locale.getDefault(), "%.2f KB/s", kbPerSec)
+    }
+}
+
+/** Format a total GB value into a human-readable string (auto GB, TB). */
+private fun formatTotal(gb: Double): String {
+    return if (gb >= 1024.0) {
+        String.format(Locale.getDefault(), "%.2f TB", gb / 1024.0)
+    } else {
+        String.format(Locale.getDefault(), "%.2f GB", gb)
+    }
+}
+
+@Composable
+fun NetworkIOCard(
+    network: utils.NetworkIOInfo,
+    modifier: Modifier = Modifier
+) {
+    StatCard(
+        title = "网络I/O",
+        modifier = modifier,
+        content = {
+            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = "下载: ${formatRate(network.downKBps)}",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Text(
+                    text = "上传: ${formatRate(network.upKBps)}",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Text(
+                    text = "下载总计: ${formatTotal(network.downTotalGB)}",
+                    style = MaterialTheme.typography.labelSmall
+                )
+                Text(
+                    text = "上传总计: ${formatTotal(network.upTotalGB)}",
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+        }
+    )
+}
+
+/** Displays the primary network adapter (NIC name, MAC, WiFi SSID, IPv4). */
+@Composable
+fun NetworkAdapterCard(
+    network: utils.NetworkIOInfo,
+    modifier: Modifier = Modifier
+) {
+    StatCard(
+        title = "网络适配器",
+        modifier = modifier,
+        content = {
+            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                // WiFi SSID (if connected to a wireless network)
+                if (!network.ssid.isNullOrBlank()) {
+                    Text(
+                        text = "WiFi: ${network.ssid}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                Text(
+                    text = if (network.ipv4.isNullOrBlank()) "IP: 未知" else "IP: ${network.ipv4}",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Text(
+                    text = if (network.nicName.isNullOrBlank()) "网卡: 未知" else "网卡: ${network.nicName}",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Text(
+                    text = if (network.mac.isNullOrBlank()) "MAC: 未知" else "MAC: ${network.mac}",
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+        }
+    )
+}

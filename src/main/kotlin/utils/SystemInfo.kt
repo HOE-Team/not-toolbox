@@ -41,6 +41,17 @@ data class DiskInfo(
     val usage: Double // percentage 0-100
 )
 
+data class NetworkIOInfo(
+    val downKBps: Double,  // download speed KB/s
+    val upKBps: Double,  // upload speed KB/s
+    val downTotalGB: Double,  // total downloaded GB
+    val upTotalGB: Double,  // total uploaded GB
+    val ssid: String? = null,  // WiFi SSID if connected to a wireless network
+    val ipv4: String? = null,  // primary IPv4 address
+    val nicName: String? = null,  // primary network interface name
+    val mac: String? = null  // primary network interface MAC address
+)
+
 data class SystemInfoSnapshot(
     val cpu: CPUInfo,
     val ram: RAMInfo,
