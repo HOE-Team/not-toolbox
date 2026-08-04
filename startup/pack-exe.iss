@@ -23,6 +23,8 @@ SolidCompression=yes
 WizardStyle=modern
 DisableProgramGroupPage=no
 UninstallDisplayIcon={app}\NTB.exe
+AppCopyright=Copyright (C) 2026 HOE Team. 保留部分权利。
+VersionInfoVersion=1.0.2.0
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
