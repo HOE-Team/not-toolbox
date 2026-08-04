@@ -16,9 +16,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Stop
+import components.MaterialSymbols
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -114,7 +112,7 @@ fun TerminalScreen() {
                 modifier = Modifier.weight(1f),
                 enabled = terminalOutput.isNotEmpty()
             ) {
-                Icon(Icons.Default.Clear, contentDescription = "清空", modifier = Modifier.size(16.dp))
+                Icon(MaterialSymbols.ClearAll, contentDescription = "清空", modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
                 Text("清空输出")
             }
@@ -128,7 +126,7 @@ fun TerminalScreen() {
                     contentColor = MaterialTheme.colorScheme.error
                 )
             ) {
-                Icon(Icons.Default.Stop, contentDescription = "停止", modifier = Modifier.size(16.dp))
+                Icon(MaterialSymbols.Stop, contentDescription = "停止", modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
                 Text("停止进程")
             }

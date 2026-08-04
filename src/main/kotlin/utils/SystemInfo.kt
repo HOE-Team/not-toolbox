@@ -59,3 +59,21 @@ data class SystemInfoSnapshot(
     val gpus: List<GPUInfo>,
     val disks: List<DiskInfo>
 )
+
+data class ServicesInfo(
+    val processCount: Int,      // 当前运行的进程数量
+    val loggedInUsers: Int      // 已登录用户数量
+)
+
+data class BatteryInfo(
+    val hasBattery: Boolean,        // 是否有电池
+    val isCharging: Boolean,        // 是否充电中
+    val capacityPercent: Double,    // 容量百分比 0-100
+    val cycleCount: Int,            // 循环次数（寿命指标）
+    val healthStatus: String        // 健康状况描述
+)
+
+data class ScreenInfo(
+    val resolution: String,         // 屏幕分辨率，如 "1920x1080"
+    val scalePercent: Int           // 显示缩放比例，如 100、125、150
+)

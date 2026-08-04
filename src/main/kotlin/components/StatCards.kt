@@ -9,15 +9,6 @@ package components
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DeveloperBoard
-import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.filled.Lan
-import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.filled.Router
-import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.SwapVert
-import androidx.compose.material.icons.outlined.Upload
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -107,7 +98,7 @@ fun CPUStatCard(
     StatCard(
         title = "CPU",
         modifier = modifier,
-        icon = Icons.Filled.Memory,
+        icon = MaterialSymbols.Memory,
         content = {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -154,7 +145,7 @@ fun RAMStatCard(
     StatCard(
         title = "内存",
         modifier = modifier,
-        icon = Icons.Filled.Storage,
+        icon = MaterialSymbols.MemoryAlt,
         content = {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -194,7 +185,7 @@ fun GPUStatCard(
     StatCard(
         title = "已安装的GPU",
         modifier = modifier,
-        icon = Icons.Filled.DeveloperBoard,
+        icon = MaterialSymbols.DeveloperBoard,
         content = {
             if (gpus.isEmpty()) {
                 // No GPU installed
@@ -257,7 +248,7 @@ fun DiskStatCard(
     StatCard(
         title = "磁盘",
         modifier = modifier,
-        icon = Icons.Filled.Storage,
+        icon = MaterialSymbols.HardDrive,
         content = {
             Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 disks.forEach { disk ->
@@ -303,12 +294,12 @@ fun NetworkIOCard(
     StatCard(
         title = "网络I/O",
         modifier = modifier,
-        icon = Icons.Filled.SwapVert,
+        icon = MaterialSymbols.SwapVert,
         content = {
             Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = Icons.Outlined.Download,
+                        imageVector = MaterialSymbols.Download,
                         contentDescription = "下载",
                         modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.primary
@@ -321,7 +312,7 @@ fun NetworkIOCard(
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = Icons.Outlined.Upload,
+                        imageVector = MaterialSymbols.Upload,
                         contentDescription = "上传",
                         modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.primary
@@ -346,7 +337,7 @@ fun NetworkAdapterCard(
     StatCard(
         title = "已连接的网络",
         modifier = modifier,
-        icon = Icons.Filled.Router,
+        icon = MaterialSymbols.Router,
         content = {
             Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 // WiFi SSID (if connected to a wireless network)
@@ -369,6 +360,155 @@ fun NetworkAdapterCard(
     )
 }
 
+/** 显示系统实时运行中的进程数量和已登录用户数量。 */
+@Composable
+fun ServicesStatCard(
+    services: utils.ServicesInfo,
+    modifier: Modifier = Modifier
+) {
+    StatCard(
+        title = "服务和进程",
+        modifier = modifier,
+        icon = MaterialSymbols.RoomService,
+        content = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(
+                        imageVector = MaterialSymbols.RoomService,
+                        contentDescription = "进程数量",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "运行中的进程: ${services.processCount}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(
+                        imageVector = MaterialSymbols.Login,
+                        contentDescription = "活动的登录会话",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "活动的登录会话: ${services.loggedInUsers}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        }
+    )
+}
+
+/** 显示系统电池的充电状态、容量与寿命信息（仅在检测到电池时显示）。 */
+@Composable
+fun BatteryStatCard(
+    battery: utils.BatteryInfo,
+    modifier: Modifier = Modifier
+) {
+    StatCard(
+        title = "电源",
+        modifier = modifier,
+        icon = MaterialSymbols.BatteryAndroidFrameFull,
+        content = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // 充电状态
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(
+                        imageVector = MaterialSymbols.BatteryAndroidFrameBolt,
+                        contentDescription = "充电状态",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = if (battery.isCharging) "充电状态: 充电中" else "充电状态: 未充电",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                // 容量
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(
+                        imageVector = MaterialSymbols.BatteryAndroidFrameQuestion,
+                        contentDescription = "容量",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "容量: ${battery.capacityPercent.toInt()}%",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                // 寿命
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(
+                        imageVector = MaterialSymbols.EcgHeart,
+                        contentDescription = "电池寿命",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "寿命: ${battery.cycleCount} 次循环（${battery.healthStatus}）",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        }
+    )
+}
+
+/** 显示屏幕分辨率与显示缩放比例。 */
+@Composable
+fun ScreenStatCard(
+    screen: utils.ScreenInfo,
+    modifier: Modifier = Modifier
+) {
+    StatCard(
+        title = "屏幕",
+        modifier = modifier,
+        icon = MaterialSymbols.DesktopWindows,
+        content = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // 分辨率
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(
+                        imageVector = MaterialSymbols.AspectRatio,
+                        contentDescription = "分辨率",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "分辨率: ${screen.resolution}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                // 缩放
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(
+                        imageVector = MaterialSymbols.PanZoom,
+                        contentDescription = "缩放",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "缩放: ${screen.scalePercent}%",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        }
+    )
+}
+
 /** Lists all installed network adapters, collapsible when there are many. */
 @Composable
 fun NetworkAdaptersCard(
@@ -378,7 +518,7 @@ fun NetworkAdaptersCard(
     StatCard(
         title = "网络适配器",
         modifier = modifier,
-        icon = Icons.Filled.Lan,
+        icon = MaterialSymbols.Lan,
         content = {
             val list = network.adapters
             if (list.isEmpty()) {

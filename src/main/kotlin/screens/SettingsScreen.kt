@@ -13,11 +13,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.Warning
+import components.MaterialSymbols
 import androidx.compose.material3.*
 import theme.isValidHex
 import androidx.compose.runtime.*
@@ -86,7 +82,7 @@ fun SettingsScreen(
                 modifier = Modifier.weight(1f)
             ) {
                 Icon(
-                    imageVector = Icons.Default.DarkMode,
+                    imageVector = MaterialSymbols.DarkMode,
                     contentDescription = "深色主题",
                     modifier = Modifier.size(20.dp)
                 )
@@ -129,7 +125,7 @@ fun SettingsScreen(
                 modifier = Modifier.weight(1f)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Palette,
+                    imageVector = MaterialSymbols.Palette,
                     contentDescription = "颜色主题",
                     modifier = Modifier.size(20.dp)
                 )
@@ -210,7 +206,7 @@ fun SettingsScreen(
                 modifier = Modifier.weight(1f)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Storage,
+                    imageVector = MaterialSymbols.Package2,
                     contentDescription = "包管理器",
                     modifier = Modifier.size(20.dp)
                 )
@@ -266,7 +262,7 @@ fun SettingsScreen(
                                     )
                                     if (!isInstalled) {
                                         Icon(
-                                            imageVector = Icons.Default.Warning,
+                                            imageVector = MaterialSymbols.Warning,
                                             contentDescription = "未安装",
                                             modifier = Modifier.size(14.dp),
                                             tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f)
@@ -310,7 +306,7 @@ fun SettingsScreen(
                 modifier = Modifier.weight(1f)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Storage,
+                    imageVector = MaterialSymbols.Flowchart,
                     contentDescription = "GitHub代理",
                     modifier = Modifier.size(20.dp)
                 )

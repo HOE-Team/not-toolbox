@@ -427,6 +427,134 @@ object SystemInfoProvider {
         )
     }
 
+    // ---- Services (processes & logged-in users) ----
+    // OSHI's processCount and sessions are memory-level queries, but to keep
+    // this absolutely non-blocking we still cache them and refresh at most
+    // every 5 seconds (well within the 1s UI tick without blocking calls).
+    @Volatile
+    private var cachedProcessCount: Int = -1
+    @Volatile
+    private var cachedLoggedInUsers: Int = -1
+    private var servicesLastRefreshNanos = 0L
+    private val SERVICES_REFRESH_INTERVAL_NANOS = 5_000_000_000L  // every 5s
+
+    fun getServices(): ServicesInfo {
+        val now = System.nanoTime()
+        if (now - servicesLastRefreshNanos > SERVICES_REFRESH_INTERVAL_NANOS) {
+            try {
+                val procCount = si.operatingSystem.processCount
+                if (procCount >= 0) cachedProcessCount = procCount
+            } catch (_: Exception) {
+            }
+            try {
+                val users = si.operatingSystem.sessions.count()
+                if (users >= 0) cachedLoggedInUsers = users
+            } catch (_: Exception) {
+            }
+            servicesLastRefreshNanos = now
+        }
+        return ServicesInfo(
+            processCount = cachedProcessCount.coerceAtLeast(0),
+            loggedInUsers = cachedLoggedInUsers.coerceAtLeast(0)
+        )
+    }
+
+    // ---- Battery ----
+    // OSHI's powerSources is a memory-level query (no subprocess), but we still
+    // cache it and refresh at most every 5s to guarantee zero UI blocking.
+    @Volatile
+    private var cachedHasBattery: Boolean = false
+    @Volatile
+    private var cachedIsCharging: Boolean = false
+    @Volatile
+    private var cachedCapacityPercent: Double = 0.0
+    @Volatile
+    private var cachedCycleCount: Int = -1
+    @Volatile
+    private var cachedHealthStatus: String = "未知"
+    private var batteryLastRefreshNanos = 0L
+    private val BATTERY_REFRESH_INTERVAL_NANOS = 5_000_000_000L  // every 5s
+
+    fun getBattery(): BatteryInfo {
+        val now = System.nanoTime()
+        if (now - batteryLastRefreshNanos > BATTERY_REFRESH_INTERVAL_NANOS) {
+            try {
+                val powerSources = si.hardware.powerSources
+                if (powerSources.isNotEmpty()) {
+                    val ps = powerSources[0]
+                    cachedHasBattery = true
+                    // Charging state: on AC (powerOnLine) and/or actively charging.
+                    // isCharging can be unreliable on some platforms, so combine
+                    // it with powerOnLine for a more robust detection.
+                    cachedIsCharging = ps.isPowerOnLine || ps.isCharging
+                    // OSHI's remainingCapacityPercent is a fraction in [0.0, 1.0]
+                    // representing 0-100%. Convert to a 0-100 percentage for display.
+                    val frac = ps.remainingCapacityPercent
+                    cachedCapacityPercent = if (frac in 0.0..1.0) frac * 100.0 else frac
+                    cachedCapacityPercent = cachedCapacityPercent.coerceIn(0.0, 100.0)
+                    cachedCycleCount = ps.cycleCount.takeIf { it >= 0 } ?: 0
+                    // PowerSource has no health field; estimate health from cycle
+                    // count (more cycles → more degraded battery).
+                    cachedHealthStatus = when {
+                        cachedCycleCount <= 0 -> "未知"
+                        cachedCycleCount < 300 -> "良好"
+                        cachedCycleCount < 600 -> "一般"
+                        else -> "较差"
+                    }
+                } else {
+                    cachedHasBattery = false
+                }
+            } catch (_: Exception) {
+            }
+            batteryLastRefreshNanos = now
+        }
+        return BatteryInfo(
+            hasBattery = cachedHasBattery,
+            isCharging = cachedIsCharging,
+            capacityPercent = cachedCapacityPercent,
+            cycleCount = cachedCycleCount,
+            healthStatus = cachedHealthStatus
+        )
+    }
+
+    // ---- Screen ----
+    // Use java.awt memory-level APIs (no subprocess, no blocking). Resolution and
+    // scale are read from the toolkit; a 5s cache avoids re-querying every tick.
+    @Volatile
+    private var cachedResolution: String = "未知"
+    @Volatile
+    private var cachedScalePercent: Int = 100
+    private var screenLastRefreshNanos = 0L
+    private val SCREEN_REFRESH_INTERVAL_NANOS = 5_000_000_000L  // every 5s
+
+    fun getScreen(): ScreenInfo {
+        val now = System.nanoTime()
+        if (now - screenLastRefreshNanos > SCREEN_REFRESH_INTERVAL_NANOS) {
+            try {
+                val gd = java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment()
+                    .defaultScreenDevice
+                // getDisplayMode() returns the physical/native display mode
+                // (not affected by OS scaling). bounds would give the logical,
+                // scaled-down resolution — the user wants the hardware one.
+                val mode = gd.displayMode
+                cachedResolution = "${mode.width}x${mode.height}"
+            } catch (_: Exception) {
+                cachedResolution = "未知"
+            }
+            try {
+                val scale = java.awt.Toolkit.getDefaultToolkit().screenResolution / 96.0 * 100.0
+                cachedScalePercent = scale.toInt().coerceAtLeast(100)
+            } catch (_: Exception) {
+                cachedScalePercent = 100
+            }
+            screenLastRefreshNanos = now
+        }
+        return ScreenInfo(
+            resolution = cachedResolution,
+            scalePercent = cachedScalePercent
+        )
+    }
+
     fun getSystemOverview(): SystemOverview {
         val os = si.operatingSystem
         val architecture = System.getProperty("os.arch") ?: "Unknown"

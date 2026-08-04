@@ -24,7 +24,6 @@ dependencies {
     implementation(compose.desktop.macos_arm64)
     
     implementation("org.jetbrains.compose.material3:material3:1.6.1")
-    implementation("org.jetbrains.compose.material:material-icons-extended:1.6.1")
     implementation("com.github.oshi:oshi-core:6.4.10")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")

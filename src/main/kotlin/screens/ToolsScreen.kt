@@ -14,16 +14,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Terminal
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.SyncDisabled
-import androidx.compose.material.icons.filled.OpenInNew
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Error
+import components.MaterialSymbols
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -182,7 +173,7 @@ private fun EmptyPackageListHint(errorMessage: String? = null) {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Icon(
-                imageVector = Icons.Default.SyncDisabled,
+                imageVector = MaterialSymbols.FileDownloadOff,
                 contentDescription = "无法获取应用列表",
                 modifier = Modifier.size(64.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
@@ -304,7 +295,7 @@ fun ToolCard(tool: PackageInfo, selectedPackageManager: PackageManagerType = Pac
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Warning,
+                        imageVector = MaterialSymbols.Warning,
                         contentDescription = "专有软件",
                         tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(14.dp)
@@ -330,7 +321,7 @@ fun ToolCard(tool: PackageInfo, selectedPackageManager: PackageManagerType = Pac
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Description,
+                        imageVector = MaterialSymbols.Description,
                         contentDescription = "开源",
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(14.dp)
@@ -353,7 +344,7 @@ fun ToolCard(tool: PackageInfo, selectedPackageManager: PackageManagerType = Pac
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Terminal,
+                        imageVector = MaterialSymbols.Terminal,
                         contentDescription = "包名",
                         modifier = Modifier.size(14.dp),
                         tint = MaterialTheme.colorScheme.primary
@@ -380,7 +371,7 @@ fun ToolCard(tool: PackageInfo, selectedPackageManager: PackageManagerType = Pac
                         modifier = Modifier.weight(1f),
                         enabled = packageManager != PackageManagerType.UNKNOWN
                     ) {
-                        Icon(Icons.Default.Download, contentDescription = "安装", modifier = Modifier.size(16.dp))
+                        Icon(MaterialSymbols.Download, contentDescription = "安装", modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("安装", fontSize = 12.sp)
                     }
@@ -391,7 +382,7 @@ fun ToolCard(tool: PackageInfo, selectedPackageManager: PackageManagerType = Pac
                         modifier = Modifier.weight(1f),
                         enabled = false
                     ) {
-                        Icon(Icons.Default.Download, contentDescription = "安装", modifier = Modifier.size(16.dp))
+                        Icon(MaterialSymbols.Download, contentDescription = "安装", modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("安装", fontSize = 12.sp)
                     }
@@ -406,7 +397,7 @@ fun ToolCard(tool: PackageInfo, selectedPackageManager: PackageManagerType = Pac
                             contentColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
-                        Icon(Icons.Default.OpenInNew, contentDescription = "查看", modifier = Modifier.size(16.dp))
+                        Icon(MaterialSymbols.OpenInNew, contentDescription = "查看", modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = if (tool.isProprietarySoftware) "用户协议" else "查看许可证",
@@ -638,7 +629,7 @@ fun InstallConfirmationDialog(
                                 contentColor = MaterialTheme.colorScheme.error
                             )
                         ) {
-                            Icon(Icons.Default.Close, contentDescription = "取消", modifier = Modifier.size(16.dp))
+                            Icon(MaterialSymbols.Close, contentDescription = "取消", modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("取消")
                         }
@@ -666,7 +657,7 @@ fun InstallConfirmationDialog(
                         if (installSuccess) {
                             // 成功图标
                             Icon(
-                                imageVector = Icons.Default.AutoAwesome,
+                                imageVector = MaterialSymbols.DownloadDone,
                                 contentDescription = "安装成功",
                                 modifier = Modifier.size(64.dp),
                                 tint = MaterialTheme.colorScheme.primary
@@ -679,7 +670,7 @@ fun InstallConfirmationDialog(
                         } else {
                             // 失败图标
                             Icon(
-                                imageVector = Icons.Default.Error,
+                                imageVector = MaterialSymbols.Warning,
                                 contentDescription = "安装失败",
                                 modifier = Modifier.size(64.dp),
                                 tint = MaterialTheme.colorScheme.error
