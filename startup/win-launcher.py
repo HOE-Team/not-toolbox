@@ -37,7 +37,7 @@ def check_jar_integrity():
     
     # 计算 SHA256
     calculated_hash = get_file_sha256(jar_path)
-    expected_hash = "C2A0431699E0093B0D4DF469D6C9F9A19AD92F31295AD912EA1AB91F70D9926E"
+    expected_hash = "E45DA56D7F9819E3888B28DD94C45093D2E7C54099EF95559F8ED04E7CAF0895"
     
     if calculated_hash is None:
         show_message_box(
