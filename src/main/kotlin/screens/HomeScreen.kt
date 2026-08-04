@@ -25,6 +25,7 @@ import components.NetworkIOCard
 import components.NetworkAdapterCard
 import components.NetworkAdaptersCard
 import components.BatteryStatCard
+import components.BluetoothStatCard
 import components.ScreenStatCard
 import components.ServicesStatCard
 import utils.SystemInfoProvider
@@ -41,6 +42,7 @@ fun HomeScreen() {
     var services by remember { mutableStateOf(SystemInfoProvider.getServices()) }
     var battery by remember { mutableStateOf(SystemInfoProvider.getBattery()) }
     var screen by remember { mutableStateOf(SystemInfoProvider.getScreen()) }
+    var bluetooth by remember { mutableStateOf(SystemInfoProvider.getBluetooth()) }
 
     // Update system info every 1 second
     LaunchedEffect(Unit) {
@@ -52,6 +54,7 @@ fun HomeScreen() {
             services = SystemInfoProvider.getServices()
             battery = SystemInfoProvider.getBattery()
             screen = SystemInfoProvider.getScreen()
+            bluetooth = SystemInfoProvider.getBluetooth()
         }
     }
 
@@ -141,6 +144,15 @@ fun HomeScreen() {
                     screen = screen,
                     modifier = Modifier.fillMaxWidth()
                 )
+            }
+            // Show the bluetooth card only if an adapter is detected.
+            if (bluetooth.hasAdapter) {
+                add {
+                    BluetoothStatCard(
+                        bluetooth = bluetooth,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         }
 

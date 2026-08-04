@@ -10,6 +10,7 @@ package utils
 import oshi.SystemInfo
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import java.nio.charset.Charset
 import kotlin.concurrent.thread
 
 object SystemInfoProvider {
@@ -21,6 +22,9 @@ object SystemInfoProvider {
 
     init {
         detectMemFreqAsync()
+        // Pre-start bluetooth detection immediately so the card is visible on
+        // the very first render (instead of appearing after a few seconds).
+        refreshBluetoothAsync()
     }
 
     private fun detectMemFreqAsync() {
@@ -135,6 +139,36 @@ object SystemInfoProvider {
             }
         }
         return null
+    }
+
+    // Version of executeCommand that forces UTF-8 decoding. Used for PowerShell
+    // commands whose output may contain non-ASCII text (e.g. bluetooth device
+    // names with Chinese characters). Without explicit UTF-8 decoding the raw
+    // bytes get misinterpreted and render as garbled text (乱码).
+    private fun executeCommandUtf8(command: String): String {
+        return try {
+            val os = System.getProperty("os.name").lowercase()
+            // Wrap so PowerShell writes UTF-8 to stdout regardless of code page.
+            val utf8Command = if (os.contains("windows")) {
+                "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; $command"
+            } else {
+                command
+            }
+            val process = if (os.contains("windows")) {
+                Runtime.getRuntime().exec(arrayOf("powershell.exe", "-NoProfile", "-Command", utf8Command))
+            } else {
+                Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
+            }
+            val reader = BufferedReader(
+                InputStreamReader(process.inputStream, Charset.forName("UTF-8"))
+            )
+            val output = reader.readText()
+            reader.close()
+            process.waitFor()
+            output.trim()
+        } catch (e: Exception) {
+            ""
+        }
     }
 
     private fun executeCommand(command: String): String {
@@ -552,6 +586,75 @@ object SystemInfoProvider {
         return ScreenInfo(
             resolution = cachedResolution,
             scalePercent = cachedScalePercent
+        )
+    }
+
+    // ---- Bluetooth ----
+    // Detecting the bluetooth adapter model requires an OS subprocess query, which
+    // can block. To keep the UI non-blocking, we run it once on a background daemon
+    // thread and persist the result in memory: once detected, the adapter name is
+    // cached forever (no repeated subprocess calls). Only the adapter model is
+    // detected here; the connected-device count has been removed.
+    @Volatile
+    private var cachedBluetoothHasAdapter: Boolean = false
+    @Volatile
+    private var cachedBluetoothModel: String = "未知"
+    @Volatile
+    private var bluetoothInitialized: Boolean = false
+    private var bluetoothInFlight = false
+
+    // Runs the bluetooth adapter-model query once on a background daemon thread
+    // and persists the result in memory. After completion, bluetoothInitialized
+    // becomes true and no further detection is triggered.
+    private fun refreshBluetoothAsync() {
+        if (bluetoothInFlight || bluetoothInitialized) return
+        bluetoothInFlight = true
+        thread(start = true, isDaemon = true) {
+            try {
+                val os = System.getProperty("os.name").lowercase()
+                if (os.contains("windows")) {
+                    // Windows: query PnP devices for the bluetooth adapter model.
+                    // Use executeCommandUtf8 so the device name decodes correctly (no 乱码).
+                    val out = executeCommandUtf8(
+                        "Get-PnpDevice -Class Bluetooth | Where-Object { \$PSItem.Status -eq 'OK' } | Select-Object -First 1 -ExpandProperty FriendlyName"
+                    )
+                    val lines = out.lines().map { it.trim() }.filter { it.isNotBlank() }
+                    if (lines.isNotEmpty()) {
+                        cachedBluetoothHasAdapter = true
+                        cachedBluetoothModel = lines[0].ifBlank { "未知" }
+                    } else {
+                        cachedBluetoothHasAdapter = false
+                    }
+                } else if (os.contains("linux")) {
+                    // Linux: use hciconfig to detect the adapter model.
+                    val hci = executeCommand("hciconfig -a 2>/dev/null | head -1")
+                    if (hci.contains("hci")) {
+                        cachedBluetoothHasAdapter = true
+                        cachedBluetoothModel = hci.trim()
+                    } else {
+                        cachedBluetoothHasAdapter = false
+                    }
+                } else {
+                    cachedBluetoothHasAdapter = false
+                }
+            } catch (_: Exception) {
+                cachedBluetoothHasAdapter = false
+            } finally {
+                bluetoothInFlight = false
+                bluetoothInitialized = true
+            }
+        }
+    }
+
+    fun getBluetooth(): BluetoothInfo {
+        // Only trigger detection once; afterwards the cached values are reused
+        // forever (persisted in memory, no repeated subprocess queries).
+        if (!bluetoothInitialized) {
+            refreshBluetoothAsync()
+        }
+        return BluetoothInfo(
+            hasAdapter = cachedBluetoothHasAdapter,
+            adapterModel = cachedBluetoothModel
         )
     }
 

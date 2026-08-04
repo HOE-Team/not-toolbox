@@ -77,3 +77,9 @@ data class ScreenInfo(
     val resolution: String,         // 屏幕分辨率，如 "1920x1080"
     val scalePercent: Int           // 显示缩放比例，如 100、125、150
 )
+
+data class BluetoothInfo(
+    val hasAdapter: Boolean,        // 是否有蓝牙适配器
+    val adapterModel: String,       // 蓝牙适配器型号
+    val isDetecting: Boolean = false // 是否正在后台检测中
+)

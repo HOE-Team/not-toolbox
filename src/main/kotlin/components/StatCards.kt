@@ -334,10 +334,17 @@ fun NetworkAdapterCard(
     network: utils.NetworkIOInfo,
     modifier: Modifier = Modifier
 ) {
+    // Connection-type icon: WiFi → NetworkWifi, wired ethernet → SettingsEthernet,
+    // anything else (bluetooth / unknown) keeps the Router symbol.
+    val connectionIcon = when {
+        !network.ssid.isNullOrBlank() -> MaterialSymbols.NetworkWifi
+        !network.ipv4.isNullOrBlank() && !network.nicName.isNullOrBlank() -> MaterialSymbols.SettingsEthernet
+        else -> MaterialSymbols.Router
+    }
     StatCard(
         title = "已连接的网络",
         modifier = modifier,
-        icon = MaterialSymbols.Router,
+        icon = connectionIcon,
         content = {
             Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 // WiFi SSID (if connected to a wireless network)
@@ -505,6 +512,26 @@ fun ScreenStatCard(
                     )
                 }
             }
+        }
+    )
+}
+
+/** 显示蓝牙适配器名称（无蓝牙适配器时不显示）。 */
+@Composable
+fun BluetoothStatCard(
+    bluetooth: utils.BluetoothInfo,
+    modifier: Modifier = Modifier
+) {
+    StatCard(
+        title = "蓝牙适配器",
+        modifier = modifier,
+        icon = MaterialSymbols.Bluetooth,
+        content = {
+            Text(
+                text = bluetooth.adapterModel,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 2
+            )
         }
     )
 }

@@ -4,6 +4,7 @@ import main.kotlin.icons.aspect_ratio
 import main.kotlin.icons.battery_android_frame_bolt
 import main.kotlin.icons.battery_android_frame_full
 import main.kotlin.icons.battery_android_frame_question
+import main.kotlin.icons.bluetooth
 import main.kotlin.icons.desktop_windows
 import main.kotlin.icons.pan_zoom
 import main.kotlin.icons.build
@@ -80,6 +81,9 @@ object MaterialSymbols {
 
     /** 平移缩放 */
     val PanZoom: ImageVector = pan_zoom
+
+    /** 蓝牙 */
+    val Bluetooth: ImageVector = bluetooth
 
     /** 工具 */
     val Build: ImageVector = build
