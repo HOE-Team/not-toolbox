@@ -25,8 +25,8 @@
 - [🤝 如何贡献](#-如何贡献)
 - [📁 项目结构](#-项目结构)
 - [🔗 技术栈](#-技术栈)
-- [📜 版权与许可证](#-版权与许可证)
 - [🔨 开发人员内容](#-开发人员内容)
+- [📜 版权与许可证](#-版权与许可证)
 
 
 ## ✨ 特性
@@ -187,14 +187,6 @@ not-toolbox/
 
 如果你觉得本项目对你有帮助，欢迎给个 Star 支持！
 
-## 📜 版权与许可证
-
-版权所有 © 2026 HOE Team。保留部分权利。
-
-本项目（NOT Toolbox）基于 **[GNU GPL v3 许可证](LICENSE)** 开源，是独立于 [NNETB](https://github.com/HOE-Team/NNETB) （[MIT 许可证](LICENSE-MIT-NNETB)）和 [NNETB-For-Linux](https://github.com/HOE-Team/NNETB-For-Linux) （[GPLv3 许可证](LICENSE-GPLV3-NNETB-FOR-LINUX)）的跨平台下游分支。
-
-启动脚本及启动器授权信息参见 [适用于 NOT Toolbox 的 Windows 平台打包工具、启动器与 Linux 平台启动脚本](./startup/ABOUT-LAUNCHER-AND-STARTUP.md) 文档。
-
 ## 🔨 开发人员内容
 ### Debug常量
 将此变量改为“true”启用调试，程序将使用本地存储的Packages Lists而不是从远程拉取。  
@@ -212,6 +204,14 @@ const val IS_DEBUG = false
 参见本仓库的 `startup` 文件夹中的 [适用于 NOT Toolbox 的 Windows 平台打包工具、启动器与 Linux 平台启动脚本](./startup/ABOUT-LAUNCHER-AND-STARTUP.md) 文档。
 
 ---
+
+## 📜 版权与许可证
+
+版权所有 © 2026 HOE Team。保留部分权利。
+
+本项目（NOT Toolbox）基于 **[GNU GPL v3 许可证](LICENSE)** 开源，是独立于 [NNETB](https://github.com/HOE-Team/NNETB) （[MIT 许可证](LICENSE-MIT-NNETB)）和 [NNETB-For-Linux](https://github.com/HOE-Team/NNETB-For-Linux) （[GPLv3 许可证](LICENSE-GPLV3-NNETB-FOR-LINUX)）的跨平台下游分支。
+
+启动脚本及启动器授权信息参见 [适用于 NOT Toolbox 的 Windows 平台打包工具、启动器与 Linux 平台启动脚本](./startup/ABOUT-LAUNCHER-AND-STARTUP.md) 文档。
 
 > [!NOTE]
 > 这份许可证(GNU GPL v3)意味着：
