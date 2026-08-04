@@ -7,11 +7,23 @@
 
 package components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DeveloperBoard
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.filled.Lan
+import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.Router
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.SwapVert
+import androidx.compose.material.icons.outlined.Upload
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
@@ -48,7 +60,8 @@ fun CircularProgressIndicator(
 fun StatCard(
     title: String,
     content: @Composable () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null
 ) {
     Card(
         modifier = modifier
@@ -59,11 +72,25 @@ fun StatCard(
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
+            // Title row: (optional) icon + title text
+            Row(
+                modifier = Modifier.padding(bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (icon != null) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
             content()
         }
     }
@@ -80,6 +107,7 @@ fun CPUStatCard(
     StatCard(
         title = "CPU",
         modifier = modifier,
+        icon = Icons.Filled.Memory,
         content = {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -126,6 +154,7 @@ fun RAMStatCard(
     StatCard(
         title = "内存",
         modifier = modifier,
+        icon = Icons.Filled.Storage,
         content = {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -165,6 +194,7 @@ fun GPUStatCard(
     StatCard(
         title = "已安装的GPU",
         modifier = modifier,
+        icon = Icons.Filled.DeveloperBoard,
         content = {
             if (gpus.isEmpty()) {
                 // No GPU installed
@@ -227,6 +257,7 @@ fun DiskStatCard(
     StatCard(
         title = "磁盘",
         modifier = modifier,
+        icon = Icons.Filled.Storage,
         content = {
             Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 disks.forEach { disk ->
@@ -272,24 +303,35 @@ fun NetworkIOCard(
     StatCard(
         title = "网络I/O",
         modifier = modifier,
+        icon = Icons.Filled.SwapVert,
         content = {
             Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = "下载: ${formatRate(network.downKBps)}",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                Text(
-                    text = "上传: ${formatRate(network.upKBps)}",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                Text(
-                    text = "下载总计: ${formatTotal(network.downTotalGB)}",
-                    style = MaterialTheme.typography.labelSmall
-                )
-                Text(
-                    text = "上传总计: ${formatTotal(network.upTotalGB)}",
-                    style = MaterialTheme.typography.labelSmall
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Outlined.Download,
+                        contentDescription = "下载",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "下载: ${formatRate(network.downKBps)}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Outlined.Upload,
+                        contentDescription = "上传",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "上传: ${formatRate(network.upKBps)}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             }
         }
     )
@@ -302,8 +344,9 @@ fun NetworkAdapterCard(
     modifier: Modifier = Modifier
 ) {
     StatCard(
-        title = "网络适配器",
+        title = "已连接的网络",
         modifier = modifier,
+        icon = Icons.Filled.Router,
         content = {
             Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 // WiFi SSID (if connected to a wireless network)
@@ -318,13 +361,62 @@ fun NetworkAdapterCard(
                     style = MaterialTheme.typography.bodySmall
                 )
                 Text(
-                    text = if (network.nicName.isNullOrBlank()) "网卡: 未知" else "网卡: ${network.nicName}",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                Text(
                     text = if (network.mac.isNullOrBlank()) "MAC: 未知" else "MAC: ${network.mac}",
                     style = MaterialTheme.typography.labelSmall
                 )
+            }
+        }
+    )
+}
+
+/** Lists all installed network adapters, collapsible when there are many. */
+@Composable
+fun NetworkAdaptersCard(
+    network: utils.NetworkIOInfo,
+    modifier: Modifier = Modifier
+) {
+    StatCard(
+        title = "网络适配器",
+        modifier = modifier,
+        icon = Icons.Filled.Lan,
+        content = {
+            val list = network.adapters
+            if (list.isEmpty()) {
+                Text(
+                    text = "未检测到已安装的网络适配器",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                // Collapse when there are more than this many items.
+                val visibleLimit = 4
+                var expanded by remember { mutableStateOf(false) }
+                val shown = if (expanded) list else list.take(visibleLimit)
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    shown.forEach { name ->
+                        Text(
+                            text = "• $name",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+
+                    // Expand / collapse toggle (only when there are extra items).
+                    if (list.size > visibleLimit) {
+                        Text(
+                            text = if (expanded) "收起" else "展开全部（${list.size}）",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .padding(top = 4.dp)
+                                .clip(MaterialTheme.shapes.small)
+                                .clickable { expanded = !expanded }
+                        )
+                    }
+                }
             }
         }
     )

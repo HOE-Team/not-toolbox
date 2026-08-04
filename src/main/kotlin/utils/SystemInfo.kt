@@ -49,7 +49,8 @@ data class NetworkIOInfo(
     val ssid: String? = null,  // WiFi SSID if connected to a wireless network
     val ipv4: String? = null,  // primary IPv4 address
     val nicName: String? = null,  // primary network interface name
-    val mac: String? = null  // primary network interface MAC address
+    val mac: String? = null,  // primary network interface MAC address
+    val adapters: List<String> = emptyList()  // all installed (physical) network adapter names
 )
 
 data class SystemInfoSnapshot(

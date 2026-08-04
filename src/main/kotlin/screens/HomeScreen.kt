@@ -20,6 +20,7 @@ import components.GPUStatCard
 import components.SystemOverviewCard
 import components.NetworkIOCard
 import components.NetworkAdapterCard
+import components.NetworkAdaptersCard
 import utils.SystemInfoProvider
 import utils.SystemInfoSnapshot
 import utils.SystemOverview
@@ -96,6 +97,12 @@ fun HomeScreen() {
             },
             {
                 NetworkIOCard(
+                    network = networkIO,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            {
+                NetworkAdaptersCard(
                     network = networkIO,
                     modifier = Modifier.fillMaxWidth()
                 )

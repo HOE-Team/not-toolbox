@@ -176,6 +176,8 @@ object SystemInfoProvider {
     private var cachedNICName: String? = null
     @Volatile
     private var cachedMAC: String? = null
+    @Volatile
+    private var cachedAdapters: List<String> = emptyList()
     private var wifiLastRefreshNanos = 0L
     private val WIFI_REFRESH_INTERVAL_NANOS = 10_000_000_000L  // every 10s
 
@@ -206,12 +208,35 @@ object SystemInfoProvider {
         }
     }
 
+    // Keywords that indicate a virtual / software (non-physical) network adapter.
+    private val virtualAdapterKeywords = listOf(
+        "virtual", "vmware", "hyper-v", "hyperv", "vbox", "virtualbox",
+        "loopback", "tap-", "tun", "wan miniport", "bluetooth",
+        "wi-fi direct", "wifi direct", "microsoft", "pseud", "ppp", "l2tp",
+        "vpn", "ndis", "tunnel", "docker", "windows"
+    )
+
     private fun refreshNetworkIdentity() {
         try {
             var ip: String? = null
             var nicName: String? = null
             var mac: String? = null
-            // Use the standard JDK API (robust across OSHI versions)
+            // Physical adapter names from OSHI's display names (e.g. "Intel Dual-Band Wireless AC-8625"),
+            // filtering out virtual / software adapters.
+            val adapters = mutableListOf<String>()
+            try {
+                for (net in hardware.networkIFs) {
+                    val display = net.displayName ?: net.name ?: ""
+                    if (display.isBlank()) continue
+                    val keyword = display.lowercase()
+                    val isVirtual = virtualAdapterKeywords.any { keyword.contains(it) }
+                    val loopback = display.contains("Loopback", true)
+                    if (isVirtual || loopback) continue
+                    if (!adapters.contains(display)) adapters.add(display)
+                }
+            } catch (_: Exception) {
+            }
+            // Use the standard JDK API (robust across OSHI versions) for the active NIC identity.
             val interfaces = java.net.NetworkInterface.getNetworkInterfaces()
             if (interfaces != null) {
                 for (nif in interfaces) {
@@ -238,10 +263,12 @@ object SystemInfoProvider {
             cachedIPv4 = ip
             cachedNICName = nicName
             cachedMAC = mac
+            cachedAdapters = adapters
         } catch (_: Exception) {
             cachedIPv4 = null
             cachedNICName = null
             cachedMAC = null
+            cachedAdapters = emptyList()
         }
     }
 
@@ -287,7 +314,8 @@ object SystemInfoProvider {
             ssid = cachedSSID,
             ipv4 = cachedIPv4,
             nicName = cachedNICName,
-            mac = cachedMAC
+            mac = cachedMAC,
+            adapters = cachedAdapters
         )
     }
 
