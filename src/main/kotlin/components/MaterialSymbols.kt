@@ -1,48 +1,6 @@
 package components
 
-import main.kotlin.icons.aspect_ratio
-import main.kotlin.icons.battery_android_frame_bolt
-import main.kotlin.icons.battery_android_frame_full
-import main.kotlin.icons.battery_android_frame_question
-import main.kotlin.icons.bluetooth
-import main.kotlin.icons.desktop_windows
-import main.kotlin.icons.pan_zoom
-import main.kotlin.icons.build
-import main.kotlin.icons.check
-import main.kotlin.icons.ecg_heart
-import main.kotlin.icons.login
-import main.kotlin.icons.room_service
-import main.kotlin.icons.clear_all
-import main.kotlin.icons.close
-import main.kotlin.icons.dark_mode
-import main.kotlin.icons.description
-import main.kotlin.icons.developer_board
-import main.kotlin.icons.download
-import main.kotlin.icons.download_done
-import main.kotlin.icons.empty_dashboard
-import main.kotlin.icons.file_download_off
-import main.kotlin.icons.flowchart
-import main.kotlin.icons.font_download
-import main.kotlin.icons.hard_drive
-import main.kotlin.icons.home
-import main.kotlin.icons.info
-import main.kotlin.icons.lan
-import main.kotlin.icons.memory
-import main.kotlin.icons.memory_alt
-import main.kotlin.icons.mobiledata_arrows
-import main.kotlin.icons.network_wifi
-import main.kotlin.icons.open_in_new
-import main.kotlin.icons.package_2
-import main.kotlin.icons.palette
-import main.kotlin.icons.router
-import main.kotlin.icons.settings
-import main.kotlin.icons.settings_ethernet
-import main.kotlin.icons.stop
-import main.kotlin.icons.storage
-import main.kotlin.icons.swap_vert
-import main.kotlin.icons.terminal
-import main.kotlin.icons.upload
-import main.kotlin.icons.warning
+import main.kotlin.icons.*
 import androidx.compose.ui.graphics.vector.ImageVector
 
 /**
@@ -180,4 +138,40 @@ object MaterialSymbols {
 
     /** 以太网设置 */
     val SettingsEthernet: ImageVector = settings_ethernet
+
+    /** 播放箭头（运行/执行） */
+    val PlayArrow: ImageVector = play_arrow
+
+    /** 添加（+） */
+    val Add: ImageVector = add
+
+    /** 删除 */
+    val Delete: ImageVector = delete
+
+    /** 刷新 */
+    val Refresh: ImageVector = refresh
+
+    /** 筛选列表 */
+    val FilterList: ImageVector = filter_list
+
+    /** 搜索 */
+    val Search: ImageVector = search
+
+    /** 编辑（铅笔） */
+    val Edit: ImageVector = edit
+
+    /** 终端2（指令） */
+    val Terminal2: ImageVector = terminal_2
+
+    /** 应用注册（可执行文件） */
+    val AppRegistration: ImageVector = app_registration
+
+    /** 搜索关闭 **/
+    val SearchOff: ImageVector = search_off
+
+    /** 连接 **/
+    val Link: ImageVector = link
+
+    /**关闭连接**/
+    val LinkOff: ImageVector = link_off
 }

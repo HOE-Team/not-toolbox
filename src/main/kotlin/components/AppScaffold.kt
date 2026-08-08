@@ -10,6 +10,7 @@ package components
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -32,55 +33,38 @@ import androidx.compose.ui.unit.dp
 fun AppScaffold(
     startBar: @Composable () -> Unit = {},
     topBarTitle: String = "概览",
+    topBarActions: @Composable RowScope.() -> Unit = {},
     content: @Composable () -> Unit = {}
 ) {
     // 检测当前操作系统
     val isMacOS = System.getProperty("os.name").lowercase().contains("mac")
-    
+
     MaterialTheme {
-        Scaffold(
-        ) { paddingValues ->
+        Scaffold() { paddingValues ->
             Row(modifier = Modifier.padding(paddingValues)) {
                 // Left rail occupies full height
-                Box(modifier = Modifier.fillMaxHeight()) {
-                    startBar()
-                }
+                Box(modifier = Modifier.fillMaxHeight()) { startBar() }
 
                 // Right side: TopBar at top, then content fills remaining space
                 Column(modifier = Modifier.fillMaxSize()) {
-                    TopBar(title = topBarTitle)
-                    
+                    TopBar(title = topBarTitle, actions = topBarActions)
+
                     // 如果是macOS，显示警告
                     if (isMacOS) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp, vertical = 8.dp)
-                                .background(
-                                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.1f),
-                                    shape = RoundedCornerShape(8.dp)
-                                )
+                                .background(MaterialTheme.colorScheme.error.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
                                 .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = MaterialSymbols.Warning,
-                                contentDescription = "警告",
-                                modifier = Modifier.size(20.dp),
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                            Text(
-                                text = "当前系统为macOS环境，您将无法使用大部分功能",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.padding(start = 8.dp)
-                            )
+                            Icon(MaterialSymbols.Warning, "警告", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.error)
+                            Text("当前系统为macOS环境，您将无法使用大部分功能", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(start = 8.dp))
                         }
                     }
-                    
-                    Box(modifier = Modifier.fillMaxSize().padding(8.dp)) {
-                        content()
-                    }
+
+                    Box(modifier = Modifier.fillMaxSize().padding(8.dp)) { content() }
                 }
             }
         }

@@ -8,11 +8,15 @@
 package main.kotlin
 
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.ui.window.singleWindowApplication
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import components.MaterialSymbols
 import components.AppScaffold
 import components.NavRail
 import screens.HomeScreen
@@ -27,7 +31,9 @@ import config.AppConfig
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.Window
-import androidx.compose.ui.window.WindowState
+import androidx.compose.ui.window.rememberWindowState
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import java.awt.Dimension
 import utils.PackageManagerType
 import utils.PackageManagerUtils
@@ -38,13 +44,26 @@ const val IS_DEBUG = false
 
 @OptIn(ExperimentalMaterial3Api::class)
 fun main() = application {
+    val windowState = rememberWindowState(width = 1280.dp, height = 600.dp)
     Window(
         onCloseRequest = ::exitApplication,
         title = "NOT Toolbox",
         icon = painterResource("img/logo.png"),
-        state = WindowState()
+        state = windowState
     ) {
+        val density = LocalDensity.current
+        LaunchedEffect(Unit) {
+            window.minimumSize = Dimension(
+                with(density) { 800.dp.roundToPx() },
+                with(density) { 600.dp.roundToPx() }
+            )
+        }
+
         var selectedNavIndex by remember { mutableStateOf(0) }
+
+        // 工具页搜索状态：Search 按钮在 TopBar，搜索框在工具页内容区
+        var toolSearchVisible by remember { mutableStateOf(false) }
+        var toolSearchQueryState by remember { mutableStateOf("") }
 
         val topBarTitle = when (selectedNavIndex) {
             1 -> "工具"
@@ -71,14 +90,30 @@ fun main() = application {
         AppTheme(darkTheme = isDark, seedHex = seedHex) {
             AppScaffold(
                 startBar = { NavRail(onSelection = { selectedNavIndex = it }) },
-                topBarTitle = topBarTitle
+                topBarTitle = topBarTitle,
+                topBarActions = {
+                    if (selectedNavIndex == 1) {
+                        IconButton(onClick = {
+                            toolSearchVisible = !toolSearchVisible
+                            if (!toolSearchVisible) toolSearchQueryState = ""
+                        }) {
+                            Icon(
+                                if (toolSearchVisible) MaterialSymbols.Close else MaterialSymbols.Search,
+                                if (toolSearchVisible) "关闭搜索" else "搜索"
+                            )
+                        }
+                    }
+                }
             ) {
                 when (selectedNavIndex) {
                     1 -> ToolsScreen(
                         selectedPackageManager = selectedPackageManager, 
                         isDebug = IS_DEBUG,
                         useProxy = useProxy,
-                        proxyUrl = proxyUrl
+                        proxyUrl = proxyUrl,
+                        searchVisible = toolSearchVisible,
+                        searchQuery = toolSearchQueryState,
+                        onSearchQueryChange = { toolSearchQueryState = it }
                     )
                     2 -> TerminalScreen()
                     3 -> SettingsScreen(

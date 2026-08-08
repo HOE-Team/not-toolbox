@@ -192,8 +192,9 @@ object TerminalSessionManager {
     /**
      * 执行命令并等待完成（直接启动进程，不通过交互式 Shell）
      * 用于安装等需要等待命令执行完毕并获取退出码的场景
+     * @param workingDirectory 进程工作目录；null 时使用当前 JVM 工作目录
      */
-    fun executeCommandAndWait(command: String) {
+    fun executeCommandAndWait(command: String, workingDirectory: String? = null) {
         // 取消之前的执行任务
         commandExecutionJob?.cancel()
         
@@ -216,6 +217,10 @@ object TerminalSessionManager {
                 
                 val processBuilder = ProcessBuilder(*cmdArray)
                 processBuilder.redirectErrorStream(true)
+                // 设置工作目录，使被启动程序能正确定位其相对路径资源
+                if (workingDirectory != null) {
+                    processBuilder.directory(java.io.File(workingDirectory))
+                }
                 val process = processBuilder.start()
                 currentProcess = process
                 
