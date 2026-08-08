@@ -174,4 +174,13 @@ object MaterialSymbols {
 
     /**关闭连接**/
     val LinkOff: ImageVector = link_off
+
+    /**HTTP**/
+    val Http: ImageVector = http
+
+    /**CodeXml**/
+    val CodeXml: ImageVector = code_xml
+
+    /**AccountCircle**/
+    val AccountCircle: ImageVector = account_circle
 }

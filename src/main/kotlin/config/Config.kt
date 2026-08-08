@@ -29,7 +29,8 @@ data class AppConfig(
     val color: String? = null, 
     val useProxy: Boolean = false,
     val proxyUrl: String = "https://gh-proxy.com",
-    val terminalEncoding: String = "UTF-8"
+    val terminalEncoding: String = "UTF-8",
+    val displayName: String? = null
 )
 
 private val configPath: Path = Path.of("config", "conf.toml")
@@ -43,6 +44,7 @@ fun loadConfig(): AppConfig {
         var useProxy: Boolean = false
         var proxyUrl: String = "https://gh-proxy.com"
         var terminalEncoding: String = "UTF-8"
+        var displayName: String? = null
         for (raw in lines) {
             val line = raw.trim()
             if (line.startsWith("#") || line.isEmpty()) continue
@@ -77,9 +79,16 @@ fun loadConfig(): AppConfig {
                     if (v.startsWith("\"") && v.endsWith("\"")) v = v.substring(1, v.length - 1)
                     if (v.isNotBlank()) terminalEncoding = v
                 }
+            } else if (line.startsWith("display_name")) {
+                val parts = line.split('=', limit = 2)
+                if (parts.size == 2) {
+                    var v = parts[1].trim()
+                    if (v.startsWith("\"") && v.endsWith("\"")) v = v.substring(1, v.length - 1)
+                    if (v.isNotBlank()) displayName = v
+                }
             }
         }
-        AppConfig(dark = dark, color = color, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding)
+        AppConfig(dark = dark, color = color, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName)
     } catch (e: Exception) {
         AppConfig()
     }
@@ -103,6 +112,13 @@ fun saveConfig(cfg: AppConfig) {
         sb.append("use_proxy = ").append(if (cfg.useProxy) "true" else "false").append('\n')
         sb.append("proxy_url = \"").append(cfg.proxyUrl).append("\"\n")
         sb.append("terminal_encoding = \"").append(cfg.terminalEncoding).append("\"\n")
+        sb.append("display_name = ")
+        if (cfg.displayName != null && cfg.displayName.isNotBlank()) {
+            sb.append('"').append(cfg.displayName).append('"')
+        } else {
+            sb.append("\"\"")
+        }
+        sb.append('\n')
         Files.writeString(tmp, sb.toString())
         Files.move(tmp, configPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
     } catch (e: Exception) {

@@ -35,12 +35,32 @@ import androidx.compose.ui.window.rememberWindowState
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import java.awt.Dimension
+import java.time.LocalTime
 import utils.PackageManagerType
 import utils.PackageManagerUtils
 import utils.TerminalSessionManager
 
 // 编译时常量：true=启用本地DEBUG包列表，false=从远程拉取
 const val IS_DEBUG = false
+
+/**
+ * 根据当前时间生成问候语，并尝试获取系统用户名。
+ * 首页 TopBar 显示"早上/中午/晚上好，<用户名>"；若获取不到用户名，用"用户"代称。
+ */
+private fun greetingForOverview(customName: String?): String {
+    val hour = LocalTime.now().hour
+    val greeting = when {
+        hour in 5..11 -> "早上好"
+        hour in 12..13 -> "中午好"
+        hour in 14..17 -> "下午好"
+        else -> "晚上好"
+    }
+    // 自定义称谓优先；未设置则用系统用户名；再不行用"用户"
+    val name = customName?.trim().takeIf { it.isNullOrBlank().not() }
+        ?: System.getProperty("user.name")?.trim().takeIf { !it.isNullOrBlank() }
+        ?: "用户"
+    return "$greeting，$name"
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 fun main() = application {
@@ -65,14 +85,6 @@ fun main() = application {
         var toolSearchVisible by remember { mutableStateOf(false) }
         var toolSearchQueryState by remember { mutableStateOf("") }
 
-        val topBarTitle = when (selectedNavIndex) {
-            1 -> "工具"
-            2 -> "终端"
-            3 -> "设置"
-            4 -> "关于"
-            else -> "概览"
-        }
-
         // load persisted settings
         val loaded = loadConfig()
         var isDark by remember { mutableStateOf(loaded.dark) }
@@ -83,9 +95,19 @@ fun main() = application {
         var selectedPackageManager by remember { mutableStateOf(PackageManagerUtils.detectPackageManager()) }
         // 终端编码设置
         var terminalEncoding by remember { mutableStateOf(loaded.terminalEncoding) }
-        
+        // 自定义称谓（主页 TopBar 对用户的称呼）
+        var displayName by remember { mutableStateOf(loaded.displayName ?: "") }
+
         // 初始化 TerminalSessionManager 的编码
         TerminalSessionManager.setEncoding(terminalEncoding)
+
+        val topBarTitle = when (selectedNavIndex) {
+            1 -> "工具"
+            2 -> "终端"
+            3 -> "设置"
+            4 -> "关于"
+            else -> greetingForOverview(displayName)
+        }
 
         AppTheme(darkTheme = isDark, seedHex = seedHex) {
             AppScaffold(
@@ -144,6 +166,11 @@ fun main() = application {
                             terminalEncoding = newEncoding
                             TerminalSessionManager.setEncoding(newEncoding)
                             saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = newEncoding))
+                        },
+                        displayName = displayName,
+                        onDisplayNameChange = { newName ->
+                            displayName = newName
+                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = newName))
                         }
                     )
                     4 -> AboutScreen()

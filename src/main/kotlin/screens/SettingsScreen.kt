@@ -41,11 +41,14 @@ fun SettingsScreen(
     proxyUrl: String = "https://ghproxy.net",
     onProxyUrlChange: (String) -> Unit = {},
     terminalEncoding: String = "UTF-8",
-    onTerminalEncodingChange: (String) -> Unit = {}
+    onTerminalEncodingChange: (String) -> Unit = {},
+    displayName: String = "",
+    onDisplayNameChange: (String) -> Unit = {}
 ) {
     var localDarkTheme by remember { mutableStateOf(isDarkTheme) }
     var hexInput by remember { mutableStateOf(selectedColor) }
     var saveStateMessage by remember { mutableStateOf<String?>(null) }
+    var displayNameInput by remember(displayName) { mutableStateOf(displayName) }
 
     // 检测当前平台和包管理器
     val osName = remember { System.getProperty("os.name").lowercase() }
@@ -65,6 +68,7 @@ fun SettingsScreen(
             text = "程序外观",
             style = MaterialTheme.typography.titleMedium,
             fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(bottom = 12.dp)
         )
 
@@ -107,6 +111,47 @@ fun SettingsScreen(
                     uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
                 )
+            )
+        }
+
+        Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+        // 设置项：称谓
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    imageVector = MaterialSymbols.AccountCircle,
+                    contentDescription = "称谓",
+                    modifier = Modifier.size(20.dp)
+                )
+                Column {
+                    Text(
+                        text = "称谓",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = "如何称呼您",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            TextField(
+                value = displayNameInput,
+                onValueChange = { displayNameInput = it; onDisplayNameChange(it) },
+                singleLine = true,
+                placeholder = { Text(System.getProperty("user.name") ?: "用户") },
+                modifier = Modifier.width(200.dp)
             )
         }
 
@@ -191,6 +236,7 @@ fun SettingsScreen(
             text = if (isWindows) "Windows包管理器" else "Linux包管理器",
             style = MaterialTheme.typography.titleMedium,
             fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(vertical = 12.dp)
         )
 
@@ -290,6 +336,7 @@ fun SettingsScreen(
             text = "代理",
             style = MaterialTheme.typography.titleMedium,
             fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(vertical = 12.dp)
         )
 
@@ -346,6 +393,11 @@ fun SettingsScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.weight(1f)
             ) {
+                Icon(
+                    imageVector = MaterialSymbols.Http,
+                    contentDescription = "GitHub代理地址",
+                    modifier = Modifier.size(20.dp)
+                )
                 Column {
                     Text(
                         text = "代理地址",
@@ -377,6 +429,7 @@ fun SettingsScreen(
             text = "终端编码",
             style = MaterialTheme.typography.titleMedium,
             fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(vertical = 12.dp)
         )
 
@@ -391,6 +444,11 @@ fun SettingsScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.weight(1f)
             ) {
+                Icon(
+                    imageVector = MaterialSymbols.CodeXml,
+                    contentDescription = "终端编码",
+                    modifier = Modifier.size(20.dp)
+                )
                 Column {
                     Text(
                         text = "终端输出编码",
