@@ -111,7 +111,7 @@ fun main() = application {
 
         AppTheme(darkTheme = isDark, seedHex = seedHex) {
             AppScaffold(
-                startBar = { NavRail(onSelection = { selectedNavIndex = it }) },
+                startBar = { NavRail(selectedIndex = selectedNavIndex, onSelection = { selectedNavIndex = it }) },
                 topBarTitle = topBarTitle,
                 topBarActions = {
                     if (selectedNavIndex == 1) {
@@ -135,7 +135,8 @@ fun main() = application {
                         proxyUrl = proxyUrl,
                         searchVisible = toolSearchVisible,
                         searchQuery = toolSearchQueryState,
-                        onSearchQueryChange = { toolSearchQueryState = it }
+                        onSearchQueryChange = { toolSearchQueryState = it },
+                        onNavigateToTerminal = { selectedNavIndex = 2 }
                     )
                     2 -> TerminalScreen()
                     3 -> SettingsScreen(

@@ -84,6 +84,18 @@ fun toneOf(color: Color, tone: Float): Color {
     return hslToColor(hsl.hue, hsl.sat, (tone / 100f).coerceIn(0f, 1f), color.alpha)
 }
 
+/**
+ * 生成接近中性灰、同时保留主色色相的低饱和容器色。
+ * M3 的 surfaceVariant/平级容器（如 #E7E0EC）饱和度很低，几乎只是"带色的浅灰"。
+ * 这里固定低饱和度，只把色调提到目标亮度，避免容器显得过浓/过深。
+ */
+fun containerColor(color: Color, tone: Float): Color {
+    val hsl = color.toHsl()
+    // 取原饱和度的约一半（上限 0.30），既保留明显的色相、又不至于像高饱和那样浓深
+    val softSat = (hsl.sat * 0.8f).coerceAtMost(0.30f)
+    return hslToColor(hsl.hue, softSat, (tone / 100f).coerceIn(0f, 1f), color.alpha)
+}
+
 fun contrastColor(color: Color): Color {
     val lum = 0.2126f * color.red + 0.7152f * color.green + 0.0722f * color.blue
     return if (lum < 0.5f) Color(0xFFFFFFFF) else Color(0xFF000000)
@@ -97,7 +109,7 @@ fun generateColorScheme(seed: Color, dark: Boolean) = if (dark) {
     val primaryTone80 = toneOf(seed, 80f)
     val primaryContainerTone30 = toneOf(seed, 30f)
     val secondaryTone80 = toneOf(seed, 80f)
-    val secondaryContainerTone30 = toneOf(seed, 30f)
+    val secondaryContainerTone30 = toneOf(seed, 81f)
     val tertiaryTone80 = toneOf(seed, 80f)
     val tertiaryContainerTone30 = toneOf(seed, 30f)
 
@@ -134,14 +146,18 @@ fun generateColorScheme(seed: Color, dark: Boolean) = if (dark) {
         onErrorContainer = Color(0xFFF9DEDC)
     )
 } else {
+    // 浅色主题：保持原有配色；仅新增 NavRail 选中项背景(secondaryContainer)
+    // 和输入框/卡片背景(surfaceVariant)跟随主色，其余图标/字体着色角色不变。
     lightColorScheme(
         primary = seed,
         onPrimary = contrastColor(seed),
         secondary = adjustLuminance(seed, 0.9f),
         onSecondary = contrastColor(adjustLuminance(seed, 0.9f)),
+        secondaryContainer = containerColor(seed, 90f),
         background = Color(0xFFFFFFFF),
         onBackground = Color(0xFF000000),
         surface = Color(0xFFFFFFFF),
-        onSurface = Color(0xFF000000)
+        onSurface = Color(0xFF000000),
+        surfaceVariant = containerColor(seed, 90f)
     )
 }

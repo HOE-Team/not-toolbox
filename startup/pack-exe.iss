@@ -4,7 +4,7 @@
 [Setup]
 AppId={{3189BC08-A081-436D-B344-A535CD722811}}
 AppName=NOT Toolbox
-AppVersion=1.0.2
+AppVersion=1.0.3
 AppPublisher=HOE Team
 AppPublisherURL=https://hoe-team.github.io
 AppSupportURL=https://hoe-team.xyz/contact-us.html
@@ -33,6 +33,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Source: ".\pyi\NTB\NTB.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: ".\pyi\NTB\_internal\*"; DestDir: "{app}\_internal"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\build\libs\NTB-all.jar"; DestDir: "{app}\binary"; Flags: ignoreversion
+Source: "binary_sha256.sha256"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\NOT Toolbox"; Filename: "{app}\NTB.exe"; WorkingDir: "{app}"; IconFilename: "{app}\NTB.exe"

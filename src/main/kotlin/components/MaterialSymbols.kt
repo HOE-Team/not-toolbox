@@ -183,4 +183,7 @@ object MaterialSymbols {
 
     /**AccountCircle**/
     val AccountCircle: ImageVector = account_circle
+
+    /**Apps**/
+    val Apps: ImageVector = apps
 }

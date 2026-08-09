@@ -9,4 +9,3 @@ echo [INFO] Deleting temp files...
 del .\NTB-all.jar
 
 echo [INFO] Done!
-pause

@@ -11,5 +11,5 @@ installer
 .idea
 
 # Others
+autopack.bat
 Get-Hash.bat
-Get-Exe-Hash.bat

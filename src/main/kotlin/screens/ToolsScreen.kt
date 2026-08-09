@@ -57,7 +57,8 @@ fun ToolsScreen(
     proxyUrl: String = "https://ghproxy.net",
     searchVisible: Boolean = false,
     searchQuery: String = "",
-    onSearchQueryChange: (String) -> Unit = {}
+    onSearchQueryChange: (String) -> Unit = {},
+    onNavigateToTerminal: () -> Unit = {}
 ) {
     var selectedTab by rememberSaveable { mutableStateOf(0) }
     var sourceTab by rememberSaveable { mutableStateOf(0) }
@@ -196,6 +197,7 @@ fun ToolsScreen(
                 onRunPackage = { packageName ->
                     isExecuting = true
                     TerminalSessionManager.executeCommandAndWait(packageName)
+                    onNavigateToTerminal()
                 },
                 onRunOffline = { item ->
                     isExecuting = true
@@ -204,10 +206,12 @@ fun ToolsScreen(
                         TerminalSessionManager.executeCommandAndWait("\"${item.value}\"", workingDir)
                     } else {
                         TerminalSessionManager.executeCommandAndWait(item.value)
+                        onNavigateToTerminal()
                     }
                 },
                 onDeleteOffline = { item -> deleteOfflineItem(item.id); offlineItems = loadOfflineItems() },
-                onEditOffline = { item -> if (item.type == MOfflineEntryType.COMMAND) editCommandId = item.id }
+                onEditOffline = { item -> if (item.type == MOfflineEntryType.COMMAND) editCommandId = item.id },
+                onAfterExecute = onNavigateToTerminal
             )
         } else {
             // 非搜索模式：显示一级 Tabs
@@ -242,7 +246,7 @@ fun ToolsScreen(
                         categories.isNotEmpty() && selectedTab < categories.size -> {
                             val tools = (packagesByCategory[categories[selectedTab]] ?: emptyList())
                                 .filter { t -> searchQuery.isBlank() || t.name.contains(searchQuery.trim(), true) || t.description?.contains(searchQuery.trim(), true) == true }
-                            if (tools.isEmpty()) EmptySearchHint() else ToolCardGrid(tools, selectedPackageManager)
+                            if (tools.isEmpty()) EmptySearchHint() else ToolCardGrid(tools, selectedPackageManager, onAfterExecute = onNavigateToTerminal)
                         }
                     }
                 }
@@ -264,7 +268,10 @@ fun ToolsScreen(
                                     if (item.type == MOfflineEntryType.PATH) {
                                         val workingDir = java.io.File(item.value).parent ?: ""
                                         TerminalSessionManager.executeCommandAndWait("\"${item.value}\"", workingDir)
-                                    } else TerminalSessionManager.executeCommandAndWait(item.value)
+                                    } else {
+                                        TerminalSessionManager.executeCommandAndWait(item.value)
+                                        onNavigateToTerminal()
+                                    }
                                 },
                                 onDelete = { item -> deleteOfflineItem(item.id); offlineItems = loadOfflineItems() },
                                 onEdit = { item -> if (item.type == MOfflineEntryType.COMMAND) editCommandId = item.id }
@@ -344,7 +351,8 @@ private fun GlobalResultGrid(
     onRunPackage: (String) -> Unit,
     onRunOffline: (OfflineItem) -> Unit,
     onDeleteOffline: (OfflineItem) -> Unit,
-    onEditOffline: (OfflineItem) -> Unit
+    onEditOffline: (OfflineItem) -> Unit,
+    onAfterExecute: () -> Unit = {}
 ) {
     // 按离线/联机分组
     val offlineResults = results.filter { !it.isOnline }
@@ -365,7 +373,7 @@ private fun GlobalResultGrid(
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     row.forEach { r ->
                         if (r.packageInfo != null) {
-                            ToolCard(r.packageInfo, selectedPackageManager, Modifier.weight(1f))
+                            ToolCard(r.packageInfo, selectedPackageManager, Modifier.weight(1f), onAfterExecute = onAfterExecute)
                         }
                     }
                     if (row.size == 1) Spacer(modifier = Modifier.weight(1f))
@@ -522,11 +530,15 @@ private fun EmptyPackageListHint(errorMessage: String? = null, onRetry: () -> Un
 }
 
 @Composable
-fun ToolCardGrid(tools: List<PackageInfo>, selectedPackageManager: PackageManagerType = PackageManagerType.UNKNOWN) {
+fun ToolCardGrid(
+    tools: List<PackageInfo>,
+    selectedPackageManager: PackageManagerType = PackageManagerType.UNKNOWN,
+    onAfterExecute: () -> Unit = {}
+) {
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         tools.chunked(2).forEach { row ->
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                row.forEach { tool -> ToolCard(tool, selectedPackageManager, Modifier.weight(1f)) }
+                row.forEach { tool -> ToolCard(tool, selectedPackageManager, Modifier.weight(1f), onAfterExecute = onAfterExecute) }
                 if (row.size == 1) Spacer(modifier = Modifier.weight(1f))
             }
         }
@@ -534,7 +546,12 @@ fun ToolCardGrid(tools: List<PackageInfo>, selectedPackageManager: PackageManage
 }
 
 @Composable
-fun ToolCard(tool: PackageInfo, selectedPackageManager: PackageManagerType = PackageManagerType.UNKNOWN, modifier: Modifier = Modifier) {
+fun ToolCard(
+    tool: PackageInfo,
+    selectedPackageManager: PackageManagerType = PackageManagerType.UNKNOWN,
+    modifier: Modifier = Modifier,
+    onAfterExecute: () -> Unit = {}
+) {
     val packageManager = remember(selectedPackageManager) { if (selectedPackageManager != PackageManagerType.UNKNOWN) selectedPackageManager else PackageManagerUtils.detectPackageManager() }
     val packageName = remember(tool, packageManager) { tool.getPackageNameForManager(packageManager) }
     val licenseOrEulaUrl = remember(tool) { if (tool.isProprietarySoftware) tool.eulaUrl else tool.licenseUrl ?: getDefaultLicenseUrl(tool.url) }
@@ -580,7 +597,10 @@ fun ToolCard(tool: PackageInfo, selectedPackageManager: PackageManagerType = Pac
         }
     }
     if (installDialogState == InstallDialogState.CONFIRM) {
-        InstallConfirmationDialog(tool.name, installCommand ?: "", { installDialogState = null }, { TerminalSessionManager.executeCommandAndWait(installCommand ?: "") })
+        InstallConfirmationDialog(tool.name, installCommand ?: "", { installDialogState = null }, {
+            TerminalSessionManager.executeCommandAndWait(installCommand ?: "")
+            onAfterExecute()
+        })
     }
 }
 
