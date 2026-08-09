@@ -1,5 +1,5 @@
-<h1 align="center">NOT Toolbox</h1>
-<h2 align="center">Not nOt noT Toolbox(?)</h2>
+<h1 align="center">NOT Toolbox/“非工具箱”</h1>
+<h3 align="center">Network-centric/网络中心化, Open-source/开源, Trans-platform/跨平台</h3>
 
 <div align="center">
     <img width="150" src="images/logo.png" alt="项目Logo">
