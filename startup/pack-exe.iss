@@ -17,12 +17,12 @@ PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 OutputDir=.\installer
 OutputBaseFilename=NOT_Toolbox_Setup
-SetupIconFile=.\res-py\logo.ico
+SetupIconFile=.\res-py\logo-install.ico
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 DisableProgramGroupPage=no
-UninstallDisplayIcon={app}\NTB.exe
+UninstallDisplayIcon={app}\logo-uninstall.ico
 AppCopyright=Copyright (C) 2026 HOE Team. 保留部分权利。
 VersionInfoVersion=1.0.2.0
 
@@ -34,11 +34,12 @@ Source: ".\pyi\NTB\NTB.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: ".\pyi\NTB\_internal\*"; DestDir: "{app}\_internal"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\build\libs\NTB-all.jar"; DestDir: "{app}\binary"; Flags: ignoreversion
 Source: "binary_sha256.sha256"; DestDir: "{app}"; Flags: ignoreversion
+Source: ".\res-py\logo-uninstall.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\NOT Toolbox"; Filename: "{app}\NTB.exe"; WorkingDir: "{app}"; IconFilename: "{app}\NTB.exe"
 Name: "{userdesktop}\NOT Toolbox"; Filename: "{app}\NTB.exe"; WorkingDir: "{app}"; IconFilename: "{app}\NTB.exe"
-Name: "{group}\Uninstall NOT Toolbox"; Filename: "{uninstallexe}"
+Name: "{group}\Uninstall NOT Toolbox"; Filename: "{uninstallexe}"; IconFilename: "{app}\logo-uninstall.ico"
 
 [Registry]
 Root: "HKA"; Subkey: "Software\NOT Toolbox"; Flags: uninsdeletekeyifempty
