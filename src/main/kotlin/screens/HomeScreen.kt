@@ -66,7 +66,6 @@ fun HomeScreen() {
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
     ) {
         val spacing = 8.dp
         val cardMinWidth = 290.dp

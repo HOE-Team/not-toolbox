@@ -18,6 +18,11 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -194,11 +199,6 @@ fun ToolsScreen(
             else GlobalResultGrid(
                 results = globalResults,
                 selectedPackageManager = selectedPackageManager,
-                onRunPackage = { packageName ->
-                    isExecuting = true
-                    TerminalSessionManager.executeCommandAndWait(packageName)
-                    onNavigateToTerminal()
-                },
                 onRunOffline = { item ->
                     isExecuting = true
                     if (item.type == MOfflineEntryType.PATH) {
@@ -210,8 +210,7 @@ fun ToolsScreen(
                     }
                 },
                 onDeleteOffline = { item -> deleteOfflineItem(item.id); offlineItems = loadOfflineItems() },
-                onEditOffline = { item -> if (item.type == MOfflineEntryType.COMMAND) editCommandId = item.id },
-                onAfterExecute = onNavigateToTerminal
+                onEditOffline = { item -> if (item.type == MOfflineEntryType.COMMAND) editCommandId = item.id }
             )
         } else {
             // 非搜索模式：显示一级 Tabs
@@ -246,7 +245,7 @@ fun ToolsScreen(
                         categories.isNotEmpty() && selectedTab < categories.size -> {
                             val tools = (packagesByCategory[categories[selectedTab]] ?: emptyList())
                                 .filter { t -> searchQuery.isBlank() || t.name.contains(searchQuery.trim(), true) || t.description?.contains(searchQuery.trim(), true) == true }
-                            if (tools.isEmpty()) EmptySearchHint() else ToolCardGrid(tools, selectedPackageManager, onAfterExecute = onNavigateToTerminal)
+                            if (tools.isEmpty()) EmptySearchHint() else ToolCardGrid(tools, selectedPackageManager)
                         }
                     }
                 }
@@ -348,11 +347,9 @@ private fun handleAddExecutable(onSelected: (String) -> Unit) {
 private fun GlobalResultGrid(
     results: List<GlobalResult>,
     selectedPackageManager: PackageManagerType,
-    onRunPackage: (String) -> Unit,
     onRunOffline: (OfflineItem) -> Unit,
     onDeleteOffline: (OfflineItem) -> Unit,
-    onEditOffline: (OfflineItem) -> Unit,
-    onAfterExecute: () -> Unit = {}
+    onEditOffline: (OfflineItem) -> Unit
 ) {
     // 按离线/联机分组
     val offlineResults = results.filter { !it.isOnline }
@@ -373,7 +370,7 @@ private fun GlobalResultGrid(
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     row.forEach { r ->
                         if (r.packageInfo != null) {
-                            ToolCard(r.packageInfo, selectedPackageManager, Modifier.weight(1f), onAfterExecute = onAfterExecute)
+                            ToolCard(r.packageInfo, selectedPackageManager, Modifier.weight(1f))
                         }
                     }
                     if (row.size == 1) Spacer(modifier = Modifier.weight(1f))
@@ -532,13 +529,12 @@ private fun EmptyPackageListHint(errorMessage: String? = null, onRetry: () -> Un
 @Composable
 fun ToolCardGrid(
     tools: List<PackageInfo>,
-    selectedPackageManager: PackageManagerType = PackageManagerType.UNKNOWN,
-    onAfterExecute: () -> Unit = {}
+    selectedPackageManager: PackageManagerType = PackageManagerType.UNKNOWN
 ) {
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         tools.chunked(2).forEach { row ->
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                row.forEach { tool -> ToolCard(tool, selectedPackageManager, Modifier.weight(1f), onAfterExecute = onAfterExecute) }
+                row.forEach { tool -> ToolCard(tool, selectedPackageManager, Modifier.weight(1f)) }
                 if (row.size == 1) Spacer(modifier = Modifier.weight(1f))
             }
         }
@@ -549,8 +545,7 @@ fun ToolCardGrid(
 fun ToolCard(
     tool: PackageInfo,
     selectedPackageManager: PackageManagerType = PackageManagerType.UNKNOWN,
-    modifier: Modifier = Modifier,
-    onAfterExecute: () -> Unit = {}
+    modifier: Modifier = Modifier
 ) {
     val packageManager = remember(selectedPackageManager) { if (selectedPackageManager != PackageManagerType.UNKNOWN) selectedPackageManager else PackageManagerUtils.detectPackageManager() }
     val packageName = remember(tool, packageManager) { tool.getPackageNameForManager(packageManager) }
@@ -597,10 +592,7 @@ fun ToolCard(
         }
     }
     if (installDialogState == InstallDialogState.CONFIRM) {
-        InstallConfirmationDialog(tool.name, installCommand ?: "", { installDialogState = null }, {
-            TerminalSessionManager.executeCommandAndWait(installCommand ?: "")
-            onAfterExecute()
-        })
+        InstallConfirmationDialog(tool.name, installCommand ?: "", { installDialogState = null }, { TerminalSessionManager.executeCommandAndWait(installCommand ?: "") })
     }
 }
 
@@ -616,6 +608,24 @@ private fun getDefaultLicenseUrl(toolUrl: String?): String? {
 private fun openToolWebsite(url: String) {
     try { if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) Desktop.getDesktop().browse(URI(url)) }
     catch (e: Exception) { println("打开网站失败 $url: ${e.message}") }
+}
+
+/** 将终端输出解析为带 ANSI 颜色的 AnnotatedString（供 Dialog 内嵌入式终端展示） */
+private fun parseAnsiForDialog(text: String): AnnotatedString {
+    if (text.isEmpty()) return AnnotatedString("")
+    return buildAnnotatedString {
+        TerminalSessionManager.parseAnsiText(text).forEach { styled ->
+            val color = TerminalSessionManager.ansiColorToComposeColor(styled.foregroundColor)
+            val bgColor = TerminalSessionManager.ansiColorToComposeColor(styled.backgroundColor)
+            withStyle(
+                SpanStyle(
+                    color = color ?: Color(0xFFCCCCCC),
+                    background = bgColor ?: Color.Transparent,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                )
+            ) { append(styled.text) }
+        }
+    }
 }
 
 private enum class InstallDialogState { CONFIRM, PROGRESS, RESULT }
@@ -634,8 +644,36 @@ fun InstallConfirmationDialog(toolName: String, installCommand: String, onDismis
             var running by remember { mutableStateOf(false) }
             LaunchedEffect(Unit) { TerminalSessionManager.outputFlow.collect { output = it } }
             LaunchedEffect(Unit) { TerminalSessionManager.isRunning.collect { r -> running = r; if (!r) { installSuccess = TerminalSessionManager.lastExitCode.value == 0; dialogState = InstallDialogState.RESULT } } }
+            // 嵌入式终端样式的输出区域（深色背景 + ANSI 着色 + 等宽字体）
+            val annotatedOutput = remember(output) { parseAnsiForDialog(output) }
             AlertDialog(onDismissRequest = {}, title = { Text("正在安装") },
-                text = { Column { Text(output, fontSize = 10.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, maxLines = 20) } },
+                text = {
+                    Column {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 120.dp, max = 320.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color(0xFF1E1E1E) // 深色终端背景
+                            )
+                        ) {
+                            val scrollState = rememberScrollState()
+                            LaunchedEffect(output) { scrollState.animateScrollTo(scrollState.maxValue) }
+                            Text(
+                                text = annotatedOutput,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(12.dp)
+                                    .verticalScroll(scrollState),
+                                style = androidx.compose.ui.text.TextStyle(
+                                    fontSize = 12.sp,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                )
+                            )
+                        }
+                    }
+                },
                 confirmButton = { if (running) OutlinedButton(onClick = { TerminalSessionManager.stopCurrentProcess() }) { Text("取消") } })
         }
         InstallDialogState.RESULT -> AlertDialog(onDismissRequest = onDismiss, title = { Text(if (installSuccess) "安装成功！" else "安装失败", style = MaterialTheme.typography.titleLarge) },
