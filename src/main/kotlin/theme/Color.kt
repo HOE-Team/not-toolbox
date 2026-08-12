@@ -109,7 +109,7 @@ fun generateColorScheme(seed: Color, dark: Boolean) = if (dark) {
     val primaryTone80 = toneOf(seed, 80f)
     val primaryContainerTone30 = toneOf(seed, 30f)
     val secondaryTone80 = toneOf(seed, 80f)
-    val secondaryContainerTone30 = toneOf(seed, 81f)
+    val secondaryContainerTone30 = toneOf(seed, 30f)
     val tertiaryTone80 = toneOf(seed, 80f)
     val tertiaryContainerTone30 = toneOf(seed, 30f)
 
