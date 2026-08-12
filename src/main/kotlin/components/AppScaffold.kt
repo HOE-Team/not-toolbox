@@ -41,7 +41,8 @@ fun AppScaffold(
 
     MaterialTheme {
         Scaffold() { paddingValues ->
-            Row(modifier = Modifier.padding(paddingValues)) {
+            // fillMaxSize 确保宽高随窗口尺寸变化强制重排（修复 Linux 下缩放窗口显示面积不变）
+            Row(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
                 // Left rail occupies full height
                 Box(modifier = Modifier.fillMaxHeight()) { startBar() }
 
