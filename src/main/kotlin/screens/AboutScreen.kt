@@ -33,13 +33,13 @@ fun AboutScreen() {
     ) {
         // 标题
         Text(
-            text = "NOT Toolbox",
+            text = "NOT Toolbox/“非工具箱”",
             style = MaterialTheme.typography.headlineLarge,
             textAlign = TextAlign.Start
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Not nOt noT Toolbox(?)",
+            text = "Network-centric/网络中心化, Open-source/开源, Trans-platform/跨平台",
             style = MaterialTheme.typography.headlineSmall,
             textAlign = TextAlign.Start,
             color = MaterialTheme.colorScheme.primary
@@ -67,7 +67,7 @@ fun AboutScreen() {
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "版本：N-1.0.3",
+            text = "版本：N-1.0.4",
             style = MaterialTheme.typography.bodyMedium
         )
 
