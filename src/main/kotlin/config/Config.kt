@@ -30,7 +30,11 @@ data class AppConfig(
     val useProxy: Boolean = false,
     val proxyUrl: String = "https://gh-proxy.com",
     val terminalEncoding: String = "UTF-8",
-    val displayName: String? = null
+    val displayName: String? = null,
+    // 壁纸相关：不获取桌面壁纸（Linux 上此值不影响显示，始终视为开启）
+    val useCustomBg: Boolean = false,
+    // 用户自选的本地背景文件名（存放在程序目录 /cardbg/ 下）
+    val customBgFile: String? = null
 )
 
 private val configPath: Path = Path.of("config", "conf.toml")
@@ -45,6 +49,8 @@ fun loadConfig(): AppConfig {
         var proxyUrl: String = "https://gh-proxy.com"
         var terminalEncoding: String = "UTF-8"
         var displayName: String? = null
+        var useCustomBg: Boolean = false
+        var customBgFile: String? = null
         for (raw in lines) {
             val line = raw.trim()
             if (line.startsWith("#") || line.isEmpty()) continue
@@ -86,9 +92,21 @@ fun loadConfig(): AppConfig {
                     if (v.startsWith("\"") && v.endsWith("\"")) v = v.substring(1, v.length - 1)
                     if (v.isNotBlank()) displayName = v
                 }
+            } else if (line.startsWith("use_custom_bg")) {
+                val parts = line.split('=', limit = 2)
+                if (parts.size == 2) {
+                    useCustomBg = parts[1].trim().lowercase() == "true"
+                }
+            } else if (line.startsWith("custom_bg_file")) {
+                val parts = line.split('=', limit = 2)
+                if (parts.size == 2) {
+                    var v = parts[1].trim()
+                    if (v.startsWith("\"") && v.endsWith("\"")) v = v.substring(1, v.length - 1)
+                    if (v.isNotBlank()) customBgFile = v
+                }
             }
         }
-        AppConfig(dark = dark, color = color, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName)
+        AppConfig(dark = dark, color = color, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, useCustomBg = useCustomBg, customBgFile = customBgFile)
     } catch (e: Exception) {
         AppConfig()
     }
@@ -115,6 +133,14 @@ fun saveConfig(cfg: AppConfig) {
         sb.append("display_name = ")
         if (cfg.displayName != null && cfg.displayName.isNotBlank()) {
             sb.append('"').append(cfg.displayName).append('"')
+        } else {
+            sb.append("\"\"")
+        }
+        sb.append('\n')
+        sb.append("use_custom_bg = ").append(if (cfg.useCustomBg) "true" else "false").append('\n')
+        sb.append("custom_bg_file = ")
+        if (cfg.customBgFile != null && cfg.customBgFile.isNotBlank()) {
+            sb.append('"').append(cfg.customBgFile).append('"')
         } else {
             sb.append("\"\"")
         }

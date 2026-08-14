@@ -186,4 +186,10 @@ object MaterialSymbols {
 
     /**Apps**/
     val Apps: ImageVector = apps
+
+    /**Imagesmode**/
+    val Imagesmode: ImageVector = imagesmode
+
+    /**Wallpaper**/
+    val Wallpaper: ImageVector = wallpaper
 }

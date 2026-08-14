@@ -514,8 +514,49 @@ object SystemInfoProvider {
         if (now - batteryLastRefreshNanos > BATTERY_REFRESH_INTERVAL_NANOS) {
             try {
                 val powerSources = si.hardware.powerSources
-                if (powerSources.isNotEmpty()) {
-                    val ps = powerSources[0]
+                // 无电池的台式机上 OSHI 可能返回一个占位 PowerSource
+                // （Windows 上总是返回一个 name="System Battery"、maxCapacity=1、
+                //  chemistry="unknown" 的占位对象），需据此过滤，避免误判有电池。
+                //
+                // 判定策略：仅当 PowerSource 同时满足以下条件时才认为存在真实电池：
+                //   1. maxCapacity > 1（占位对象的 maxCapacity 恒为 1，真实电池
+                //      的容量通常远大于 1）
+                //   2. remainingCapacityPercent 在有效范围 [0.0, 1.0] 内
+                //   3. chemistry 非空且不是占位值（如 "unknown"、"none" 等）
+                //
+                // 注意：不能检查 isCharging/isDischarging，因为充满电的电池
+                // 两个状态都可能为 false，会导致真实电池被误过滤。
+                val ps = powerSources.firstOrNull { src ->
+                    // 1. 最大容量检查（占位对象 maxCapacity=1，真实电池远大于 1）
+                    val capOk = try {
+                        src.maxCapacity > 1
+                    } catch (_: Exception) {
+                        false
+                    }
+
+                    // 2. 剩余容量百分比检查（有效值应在 [0.0, 1.0] 范围内）
+                    val pctOk = try {
+                        val pct = src.remainingCapacityPercent
+                        pct in 0.0..1.0
+                    } catch (_: Exception) {
+                        false
+                    }
+
+                    // 3. 化学类型检查（真正的电池有化学类型，占位对象为 "unknown"）
+                    val chemOk = try {
+                        val chem = src.chemistry
+                        !chem.isNullOrBlank() &&
+                            !chem.equals("unknown", ignoreCase = true) &&
+                            !chem.equals("none", ignoreCase = true) &&
+                            !chem.equals("n/a", ignoreCase = true)
+                    } catch (_: Exception) {
+                        false
+                    }
+
+                    capOk && pctOk && chemOk
+                }
+
+                if (ps != null) {
                     cachedHasBattery = true
                     // Charging state: on AC (powerOnLine) and/or actively charging.
                     // isCharging can be unreliable on some platforms, so combine
@@ -673,44 +714,30 @@ object SystemInfoProvider {
 
         val computerName = try { java.net.InetAddress.getLocalHost().hostName } catch (_: Exception) { "Unknown" }
 
-        // Wallpaper path detection for different platforms
+        // 桌面壁纸路径决策：
+        // - 用户自选了本地图像（customBgFileName 非空）→ 使用 cardbg/ 下的该文件。
+        // - 否则，若"不获取桌面壁纸"开启（Linux 上强制开启）→ 返回 null（走默认壁纸）。
+        // - Windows 且未开启"不获取桌面壁纸" → 尝试读取注册表获取真实壁纸。
         var wallpaperPath: String? = null
         val currentOs = System.getProperty("os.name").lowercase()
         
-        if (currentOs.contains("windows")) {
-            // Windows: check registry
-            try {
-                val reg = executeCommand("reg query \"HKCU\\Control Panel\\Desktop\" /v WallPaper")
-                val line = reg.split("\n").firstOrNull { it.contains("WallPaper", ignoreCase = true) }
-                if (line != null) {
-                    val parts = line.trim().split(Regex("\\s{2,}"))
-                    wallpaperPath = if (parts.size >= 3) parts[2] else line.trim().split(" ").lastOrNull()
-                }
-            } catch (_: Exception) {
-                wallpaperPath = null
-            }
-        } else if (currentOs.contains("linux")) {
-            // Linux: check common desktop environments
-            try {
-                // Try GNOME
-                var out = executeCommand("gsettings get org.gnome.desktop.background picture-uri 2>/dev/null")
-                if (out.isNotBlank() && !out.contains("No such schema") && out.contains("file://")) {
-                    wallpaperPath = out.replace("file://", "").replace("'", "").trim()
-                } else {
-                    // Try KDE
-                    out = executeCommand("kreadconfig5 --file kdeglobals --group Wallpapers --key wallpaper 2>/dev/null")
-                    if (out.isNotBlank()) {
-                        wallpaperPath = out.trim()
-                    } else {
-                        // Try XFCE
-                        out = executeCommand("xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor0/workspace0/last-image 2>/dev/null")
-                        if (out.isNotBlank()) {
-                            wallpaperPath = out.trim()
-                        }
+        // 优先：用户自选本地图像
+        val customFileName = config.WallpaperState.customBgFileName
+        if (!customFileName.isNullOrBlank()) {
+            wallpaperPath = java.io.File("cardbg", customFileName).absolutePath
+        } else if (!config.WallpaperState.useDefaultWallpaper()) {
+            if (currentOs.contains("windows")) {
+                // Windows: check registry
+                try {
+                    val reg = executeCommand("reg query \"HKCU\\Control Panel\\Desktop\" /v WallPaper")
+                    val line = reg.split("\n").firstOrNull { it.contains("WallPaper", ignoreCase = true) }
+                    if (line != null) {
+                        val parts = line.trim().split(Regex("\\s{2,}"))
+                        wallpaperPath = if (parts.size >= 3) parts[2] else line.trim().split(" ").lastOrNull()
                     }
+                } catch (_: Exception) {
+                    wallpaperPath = null
                 }
-            } catch (_: Exception) {
-                wallpaperPath = null
             }
         }
 

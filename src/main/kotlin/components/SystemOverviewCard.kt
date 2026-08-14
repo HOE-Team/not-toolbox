@@ -42,22 +42,46 @@ fun SystemOverviewCard(
         Box(modifier = Modifier
             .fillMaxWidth()
             .wrapContentHeight()) {
-            // Background image if available
-            val wallpaperBitmap = remember(overview.wallpaperPath) {
-                try {
-                    val p = overview.wallpaperPath
-                    if (!p.isNullOrBlank()) {
+            // 背景壁纸。
+            // - Linux：不获取真实壁纸，直接使用内置默认壁纸。
+            // - Windows：尝试加载注册表检测到的壁纸路径；仅当明确无法获取
+            //   （未检测到 / 文件不存在 / 加载失败）时才回退到默认壁纸。
+            // 默认壁纸：亮色主题使用 default-light.png，暗色主题使用 default.png。
+            // 根据当前 MaterialTheme 的 surface 底色亮度推断处于亮色还是暗色主题。
+            val surfaceColor = MaterialTheme.colorScheme.surface
+            val surfaceLum = surfaceColor.red * 0.2126f + surfaceColor.green * 0.7152f + surfaceColor.blue * 0.0722f
+            val isDark = surfaceLum < 0.5f
+            val wallpaperBitmap = remember(overview.wallpaperPath, isDark) {
+                var bmp: ImageBitmap? = null
+                val p = overview.wallpaperPath
+                if (!p.isNullOrBlank()) {
+                    try {
                         val f = File(p)
                         if (f.exists()) {
                             val stream = FileInputStream(f)
-                            val bmp = loadImageBitmap(stream)
+                            bmp = loadImageBitmap(stream)
                             stream.close()
-                            bmp
-                        } else null
-                    } else null
-                } catch (_: Exception) {
-                    null
+                        }
+                    } catch (_: Exception) {
+                        bmp = null
+                    }
                 }
+                if (bmp == null) {
+                    bmp = try {
+                        // 回退：内置默认壁纸（打包在 resources/img/ 下）
+                        val fallbackName = if (isDark) "img/default.png" else "img/default-light.png"
+                        val res = Thread.currentThread().contextClassLoader?.getResourceAsStream(fallbackName)
+                            ?: ClassLoader.getSystemClassLoader().getResourceAsStream(fallbackName)
+                        if (res != null) {
+                            val loaded = loadImageBitmap(res)
+                            res.close()
+                            loaded
+                        } else null
+                    } catch (_: Exception) {
+                        null
+                    }
+                }
+                bmp
             }
 
             if (wallpaperBitmap != null) {

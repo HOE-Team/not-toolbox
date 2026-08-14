@@ -28,6 +28,7 @@ import theme.AppTheme
 import config.loadConfig
 import config.saveConfig
 import config.AppConfig
+import config.WallpaperState
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.Window
@@ -97,9 +98,16 @@ fun main() = application {
         var terminalEncoding by remember { mutableStateOf(loaded.terminalEncoding) }
         // 自定义称谓（主页 TopBar 对用户的称呼）
         var displayName by remember { mutableStateOf(loaded.displayName ?: "") }
+        // 壁纸设置
+        var useCustomBg by remember { mutableStateOf(loaded.useCustomBg) }
+        var customBgFile by remember { mutableStateOf(loaded.customBgFile) }
 
         // 初始化 TerminalSessionManager 的编码
         TerminalSessionManager.setEncoding(terminalEncoding)
+
+        // 写入壁纸运行时状态（供 SystemInfoProvider 读取）
+        WallpaperState.useCustomBg = useCustomBg
+        WallpaperState.customBgFileName = customBgFile
 
         val topBarTitle = when (selectedNavIndex) {
             1 -> "工具"
@@ -172,6 +180,18 @@ fun main() = application {
                         onDisplayNameChange = { newName ->
                             displayName = newName
                             saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = newName))
+                        },
+                        useCustomBg = useCustomBg,
+                        onUseCustomBgChange = { newVal ->
+                            useCustomBg = newVal
+                            WallpaperState.useCustomBg = newVal
+                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, useCustomBg = newVal, customBgFile = customBgFile))
+                        },
+                        customBgFile = customBgFile,
+                        onCustomBgFileChange = { newFile ->
+                            customBgFile = newFile
+                            WallpaperState.customBgFileName = newFile
+                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, useCustomBg = useCustomBg, customBgFile = newFile))
                         }
                     )
                     4 -> AboutScreen()

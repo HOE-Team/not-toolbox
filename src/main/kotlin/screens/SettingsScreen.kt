@@ -24,7 +24,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import utils.PackageManagerUtils
 import utils.PackageManagerType
+import utils.CardBgManager
 import config.TerminalEncoding
+import java.awt.FileDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,7 +45,11 @@ fun SettingsScreen(
     terminalEncoding: String = "UTF-8",
     onTerminalEncodingChange: (String) -> Unit = {},
     displayName: String = "",
-    onDisplayNameChange: (String) -> Unit = {}
+    onDisplayNameChange: (String) -> Unit = {},
+    useCustomBg: Boolean = false,
+    onUseCustomBgChange: (Boolean) -> Unit = {},
+    customBgFile: String? = null,
+    onCustomBgFileChange: (String?) -> Unit = {}
 ) {
     var localDarkTheme by remember { mutableStateOf(isDarkTheme) }
     var hexInput by remember { mutableStateOf(selectedColor) }
@@ -225,6 +231,108 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(top = 4.dp)
                     )
+                }
+            }
+        }
+
+        // 设置项：不获取桌面壁纸
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    imageVector = MaterialSymbols.Wallpaper,
+                    contentDescription = "不获取桌面壁纸",
+                    modifier = Modifier.size(20.dp)
+                )
+                Column {
+                    Text(
+                        text = "不获取桌面壁纸",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = if (isWindows) "开启后概览卡片使用内置默认壁纸" else "不可关闭",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Switch(
+                checked = useCustomBg,
+                onCheckedChange = { onUseCustomBgChange(it) },
+                enabled = isWindows,  // Linux 强制开启，不可关闭
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                    checkedTrackColor = MaterialTheme.colorScheme.primary,
+                    uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            )
+        }
+
+        // 设置项：使用本地图像（仅当开启"不获取桌面壁纸"时显示/可用）
+        if (useCustomBg || !isWindows) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = MaterialSymbols.Imagesmode,
+                        contentDescription = "使用本地图像",
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Column {
+                        Text(
+                            text = "使用本地图像",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = if (customBgFile != null) "已选择本地图像" else "选择一张图片作为概览卡片背景",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = {
+                        val dialog = FileDialog(null as java.awt.Frame?, "选择图片", FileDialog.LOAD)
+                        dialog.isVisible = true
+                        val dir = dialog.directory
+                        val file = dialog.file
+                        if (dir != null && file != null) {
+                            val path = java.io.File(dir, file).absolutePath
+                            val imported = CardBgManager.importImage(path)
+                            if (imported != null) {
+                                onCustomBgFileChange(imported)
+                            }
+                        }
+                    }) {
+                        Icon(MaterialSymbols.OpenInNew, "选择", Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(if (customBgFile != null) "更换" else "选择")
+                    }
+                    if (customBgFile != null) {
+                        OutlinedButton(onClick = { onCustomBgFileChange(null) }) {
+                            Icon(MaterialSymbols.Close, "撤下", Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("撤下")
+                        }
+                    }
                 }
             }
         }
