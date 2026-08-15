@@ -4,7 +4,7 @@
 [Setup]
 AppId={{3189BC08-A081-436D-B344-A535CD722811}}
 AppName=NOT Toolbox
-AppVersion=1.0.4
+AppVersion=1.0.5
 AppPublisher=HOE Team
 AppPublisherURL=https://hoe-team.github.io
 AppSupportURL=https://hoe-team.xyz/contact-us.html
@@ -24,7 +24,7 @@ WizardStyle=modern
 DisableProgramGroupPage=no
 UninstallDisplayIcon={app}\logo-uninstall.ico
 AppCopyright=Copyright (C) 2026 HOE Team. 保留部分权利。
-VersionInfoVersion=1.0.4.0
+VersionInfoVersion=1.0.5.0
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

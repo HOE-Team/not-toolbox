@@ -67,7 +67,7 @@ fun AboutScreen() {
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "版本：N-1.0.4",
+            text = "版本：N-1.0.5",
             style = MaterialTheme.typography.bodyMedium
         )
 
