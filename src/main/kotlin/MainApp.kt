@@ -40,6 +40,7 @@ import java.time.LocalTime
 import utils.PackageManagerType
 import utils.PackageManagerUtils
 import utils.TerminalSessionManager
+import utils.CardBgManager
 
 // 编译时常量：true=启用本地DEBUG包列表，false=从远程拉取
 const val IS_DEBUG = false
@@ -189,6 +190,11 @@ fun main() = application {
                         },
                         customBgFile = customBgFile,
                         onCustomBgFileChange = { newFile ->
+                            // 更换或撤下背景时，删除上一次设置的背景图像在 cardbg/ 目录中的缓存
+                            val oldFile = customBgFile
+                            if (oldFile != null && oldFile != newFile) {
+                                CardBgManager.deleteImage(oldFile)
+                            }
                             customBgFile = newFile
                             WallpaperState.customBgFileName = newFile
                             saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, useCustomBg = useCustomBg, customBgFile = newFile))

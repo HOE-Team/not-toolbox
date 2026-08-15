@@ -50,4 +50,20 @@ object CardBgManager {
         val f = cardBgDir.resolve(fileName).toFile()
         return if (f.exists()) f.absolutePath else null
     }
+
+    /**
+     * 删除 cardbg/ 目录下的指定背景图像文件。
+     * 仅允许删除该目录内的文件（防止路径穿越）；文件不存在或删除失败时静默忽略。
+     */
+    fun deleteImage(fileName: String?) {
+        if (fileName.isNullOrBlank()) return
+        try {
+            val target = cardBgDir.resolve(fileName).normalize()
+            if (target.startsWith(cardBgDir)) {
+                Files.deleteIfExists(target)
+            }
+        } catch (_: Exception) {
+            // 忽略删除失败
+        }
+    }
 }
