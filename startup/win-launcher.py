@@ -41,7 +41,7 @@ class TASKDIALOG_BUTTON(ctypes.Structure):
         ("pszButtonText", wintypes.LPCWSTR),
     ]
 
-# TASKDIALOGCONFIG 结构体（Vista+ 完整版）
+# TASKDIALOGCONFIG 结构体
 class TASKDIALOGCONFIG(ctypes.Structure):
     _fields_ = [
         ("cbSize", wintypes.DWORD),
@@ -210,7 +210,7 @@ def read_expected_sha256():
         return None
 
 def check_jar_integrity():
-    jar_path = "./binary/NTB-all.jar"
+    jar_path = "./binary/NTB-shrunk.jar"
     
     # 检查文件是否存在
     if not os.path.exists(jar_path):
@@ -360,7 +360,7 @@ def run_jar():
             startupinfo.wShowWindow = SW_HIDE
             
             subprocess.run(
-                ["java", "-jar", "./binary/NTB-all.jar"],
+                ["java", "-jar", "./binary/NTB-shrunk.jar"],
                 creationflags=CREATE_NO_WINDOW,
                 startupinfo=startupinfo,
                 shell=False

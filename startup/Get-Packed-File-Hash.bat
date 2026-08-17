@@ -3,7 +3,7 @@ setlocal enabledelayedexpansion
 
 cd /d "%~dp0"
 
-call :hash_file "..\build\libs\NTB-all.jar"
+call :hash_file "..\build\libs\NTB-shrunk.jar"
 call :hash_file "NTB.tar.gz"
 call :hash_file "installer\NOT_Toolbox_Setup.exe"
 

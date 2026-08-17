@@ -34,4 +34,4 @@ if [ "$JAVA_VERSION" -lt 21 ]; then
 fi
 
 # 使用 sudo 权限启动 NOT Toolbox
-exec sudo java -jar NTB-all.jar
+exec sudo java -jar NTB-shrinuk.jar

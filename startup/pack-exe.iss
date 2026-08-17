@@ -4,7 +4,7 @@
 [Setup]
 AppId={{3189BC08-A081-436D-B344-A535CD722811}}
 AppName=NOT Toolbox
-AppVersion=1.0.5
+AppVersion=1.0.5.1
 AppPublisher=HOE Team
 AppPublisherURL=https://hoe-team.github.io
 AppSupportURL=https://hoe-team.xyz/contact-us.html
@@ -24,7 +24,7 @@ WizardStyle=modern
 DisableProgramGroupPage=no
 UninstallDisplayIcon={app}\logo-uninstall.ico
 AppCopyright=Copyright (C) 2026 HOE Team. 保留部分权利。
-VersionInfoVersion=1.0.5.0
+VersionInfoVersion=1.0.5.1
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -32,7 +32,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Files]
 Source: ".\pyi\NTB\NTB.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: ".\pyi\NTB\_internal\*"; DestDir: "{app}\_internal"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\build\libs\NTB-all.jar"; DestDir: "{app}\binary"; Flags: ignoreversion
+Source: "..\build\libs\NTB-shrunk.jar"; DestDir: "{app}\binary"; Flags: ignoreversion
 Source: "binary_sha256.sha256"; DestDir: "{app}"; Flags: ignoreversion
 Source: ".\res-py\logo-uninstall.ico"; DestDir: "{app}"; Flags: ignoreversion
 
