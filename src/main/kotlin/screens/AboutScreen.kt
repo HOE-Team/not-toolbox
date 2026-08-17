@@ -10,7 +10,8 @@ package screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,7 +53,7 @@ fun AboutScreen() {
         )
 
         Spacer(modifier = Modifier.height(24.dp))
-        Divider()
+        HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
         Spacer(modifier = Modifier.height(24.dp))
 
         // 版本内容
@@ -72,7 +73,7 @@ fun AboutScreen() {
         )
 
         Spacer(modifier = Modifier.height(24.dp))
-        Divider()
+        HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
         Spacer(modifier = Modifier.height(24.dp))
 
         // 版权信息

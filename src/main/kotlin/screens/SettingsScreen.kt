@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import components.MaterialSymbols
 import androidx.compose.material3.*
+import androidx.compose.material3.HorizontalDivider
 import theme.isValidHex
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -123,7 +124,11 @@ fun SettingsScreen(
             )
         }
 
-        Divider(modifier = Modifier.padding(vertical = 8.dp))
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 8.dp),
+            thickness = DividerDefaults.Thickness,
+            color = DividerDefaults.color
+        )
 
         // 设置项：称谓
         Row(
@@ -164,7 +169,11 @@ fun SettingsScreen(
             )
         }
 
-        Divider(modifier = Modifier.padding(vertical = 8.dp))
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 8.dp),
+            thickness = DividerDefaults.Thickness,
+            color = DividerDefaults.color
+        )
 
         // 设置项2：HEX 颜色输入与保存
         Row(
@@ -237,6 +246,12 @@ fun SettingsScreen(
                 }
             }
         }
+
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 8.dp),
+            thickness = DividerDefaults.Thickness,
+            color = DividerDefaults.color
+        )
 
         // 设置项：不获取桌面壁纸
         Row(
@@ -340,7 +355,11 @@ fun SettingsScreen(
             }
         }
 
-        Divider(modifier = Modifier.padding(vertical = 8.dp))
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 8.dp),
+            thickness = DividerDefaults.Thickness,
+            color = DividerDefaults.color
+        )
 
         // 包管理器检测和选择（根据平台显示不同标题）
         Text(
@@ -440,7 +459,11 @@ fun SettingsScreen(
             }
         }
 
-        Divider(modifier = Modifier.padding(vertical = 8.dp))
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 8.dp),
+            thickness = DividerDefaults.Thickness,
+            color = DividerDefaults.color
+        )
 
         // 代理设置
         Text(
@@ -533,7 +556,11 @@ fun SettingsScreen(
             )
         }
 
-        Divider(modifier = Modifier.padding(vertical = 8.dp))
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 8.dp),
+            thickness = DividerDefaults.Thickness,
+            color = DividerDefaults.color
+        )
 
         // 终端编码设置
         Text(
@@ -617,7 +644,11 @@ fun SettingsScreen(
             }
         }
 
-        Divider(modifier = Modifier.padding(vertical = 8.dp))
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 8.dp),
+            thickness = DividerDefaults.Thickness,
+            color = DividerDefaults.color
+        )
 
         // 工具指令会话模式设置
         Text(
