@@ -29,6 +29,7 @@ import config.loadConfig
 import config.saveConfig
 import config.AppConfig
 import config.WallpaperState
+import config.ToolCommandSessionMode
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.Window
@@ -102,9 +103,20 @@ fun main() = application {
         // 壁纸设置
         var useCustomBg by remember { mutableStateOf(loaded.useCustomBg) }
         var customBgFile by remember { mutableStateOf(loaded.customBgFile) }
+        // 工具指令会话模式
+        var toolCommandSessionMode by remember { mutableStateOf(loaded.toolCommandSession) }
 
         // 初始化 TerminalSessionManager 的编码
         TerminalSessionManager.setEncoding(terminalEncoding)
+
+        // 初始化 TerminalSessionManager 的会话路由模式
+        TerminalSessionManager.setToolCommandSessionMode(ToolCommandSessionMode.fromName(toolCommandSessionMode))
+
+        // 仅在"使用默认会话"模式下预先创建默认会话并设为活动；"每次新建会话"模式下初始无会话（终端页显示空状态）
+        if (ToolCommandSessionMode.fromName(toolCommandSessionMode) == ToolCommandSessionMode.DEFAULT) {
+            TerminalSessionManager.getOrCreateDefaultSession()
+            TerminalSessionManager.setActiveSession(TerminalSessionManager.defaultSessionId)
+        }
 
         // 写入壁纸运行时状态（供 SystemInfoProvider 读取）
         WallpaperState.useCustomBg = useCustomBg
@@ -134,6 +146,23 @@ fun main() = application {
                             )
                         }
                     }
+                    if (selectedNavIndex == 2) {
+                        // 终端页：新建会话按钮
+                        IconButton(onClick = {
+                            TerminalSessionManager.createAndActivateSession()
+                        }) {
+                            Icon(MaterialSymbols.Add, "新建会话")
+                        }
+                        // 终端页：清除所有标签页按钮
+                        IconButton(
+                            onClick = {
+                                TerminalSessionManager.clearAllSessions()
+                            },
+                            enabled = TerminalSessionManager.sessions.isNotEmpty()
+                        ) {
+                            Icon(MaterialSymbols.Delete, "清除所有标签页")
+                        }
+                    }
                 }
             ) {
                 when (selectedNavIndex) {
@@ -152,41 +181,41 @@ fun main() = application {
                         isDarkTheme = isDark,
                         onThemeChange = { newDark ->
                             isDark = newDark
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding))
+                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, toolCommandSession = toolCommandSessionMode))
                         },
                         selectedColor = seedHex ?: "",
                         onColorChange = { hex ->
                             seedHex = if (hex.isBlank()) null else hex
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding))
+                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, toolCommandSession = toolCommandSessionMode))
                         },
                         selectedPackageManager = selectedPackageManager,
                         onPackageManagerChange = { selectedPackageManager = it },
                         useProxy = useProxy,
                         onUseProxyChange = { newUseProxy ->
                             useProxy = newUseProxy
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding))
+                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, toolCommandSession = toolCommandSessionMode))
                         },
                         proxyUrl = proxyUrl,
                         onProxyUrlChange = { newProxyUrl ->
                             proxyUrl = newProxyUrl
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding))
+                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, toolCommandSession = toolCommandSessionMode))
                         },
                         terminalEncoding = terminalEncoding,
                         onTerminalEncodingChange = { newEncoding ->
                             terminalEncoding = newEncoding
                             TerminalSessionManager.setEncoding(newEncoding)
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = newEncoding))
+                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = newEncoding, toolCommandSession = toolCommandSessionMode))
                         },
                         displayName = displayName,
                         onDisplayNameChange = { newName ->
                             displayName = newName
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = newName))
+                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = newName, toolCommandSession = toolCommandSessionMode))
                         },
                         useCustomBg = useCustomBg,
                         onUseCustomBgChange = { newVal ->
                             useCustomBg = newVal
                             WallpaperState.useCustomBg = newVal
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, useCustomBg = newVal, customBgFile = customBgFile))
+                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, useCustomBg = newVal, customBgFile = customBgFile, toolCommandSession = toolCommandSessionMode))
                         },
                         customBgFile = customBgFile,
                         onCustomBgFileChange = { newFile ->
@@ -197,7 +226,13 @@ fun main() = application {
                             }
                             customBgFile = newFile
                             WallpaperState.customBgFileName = newFile
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, useCustomBg = useCustomBg, customBgFile = newFile))
+                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, useCustomBg = useCustomBg, customBgFile = newFile, toolCommandSession = toolCommandSessionMode))
+                        },
+                        toolCommandSessionMode = toolCommandSessionMode,
+                        onToolCommandSessionModeChange = { newMode ->
+                            toolCommandSessionMode = newMode
+                            TerminalSessionManager.setToolCommandSessionMode(ToolCommandSessionMode.fromName(newMode))
+                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, useCustomBg = useCustomBg, customBgFile = customBgFile, toolCommandSession = newMode))
                         }
                     )
                     4 -> AboutScreen()

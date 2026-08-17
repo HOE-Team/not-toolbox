@@ -26,6 +26,7 @@ import utils.PackageManagerUtils
 import utils.PackageManagerType
 import utils.CardBgManager
 import config.TerminalEncoding
+import config.ToolCommandSessionMode
 import java.awt.FileDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,7 +50,9 @@ fun SettingsScreen(
     useCustomBg: Boolean = false,
     onUseCustomBgChange: (Boolean) -> Unit = {},
     customBgFile: String? = null,
-    onCustomBgFileChange: (String?) -> Unit = {}
+    onCustomBgFileChange: (String?) -> Unit = {},
+    toolCommandSessionMode: String = "NEW",
+    onToolCommandSessionModeChange: (String) -> Unit = {}
 ) {
     var localDarkTheme by remember { mutableStateOf(isDarkTheme) }
     var hexInput by remember { mutableStateOf(selectedColor) }
@@ -607,6 +610,90 @@ fun SettingsScreen(
                             onClick = {
                                 onTerminalEncodingChange(encoding.charsetName)
                                 encodingExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+        // 工具指令会话模式设置
+        Text(
+            text = "工具指令会话",
+            style = MaterialTheme.typography.titleMedium,
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(vertical = 12.dp)
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    imageVector = MaterialSymbols.Terminal2,
+                    contentDescription = "工具指令会话",
+                    modifier = Modifier.size(20.dp)
+                )
+                Column {
+                    Text(
+                        text = "工具指令会话模式",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = "工具页执行本地指令时如何创建终端会话",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // 会话模式选择下拉菜单
+            var sessionModeExpanded by remember { mutableStateOf(false) }
+            val currentMode = remember(toolCommandSessionMode) {
+                ToolCommandSessionMode.fromName(toolCommandSessionMode)
+            }
+            ExposedDropdownMenuBox(
+                expanded = sessionModeExpanded,
+                onExpandedChange = { sessionModeExpanded = !sessionModeExpanded },
+                modifier = Modifier.width(200.dp)
+            ) {
+                TextField(
+                    value = currentMode.displayName,
+                    onValueChange = {},
+                    readOnly = true,
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = sessionModeExpanded) },
+                    colors = ExposedDropdownMenuDefaults.textFieldColors(),
+                    modifier = Modifier.menuAnchor()
+                )
+
+                ExposedDropdownMenu(
+                    expanded = sessionModeExpanded,
+                    onDismissRequest = { sessionModeExpanded = false }
+                ) {
+                    ToolCommandSessionMode.entries.forEach { mode ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = mode.displayName,
+                                    color = if (mode.name == toolCommandSessionMode)
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.onSurface
+                                )
+                            },
+                            onClick = {
+                                onToolCommandSessionModeChange(mode.name)
+                                sessionModeExpanded = false
                             }
                         )
                     }

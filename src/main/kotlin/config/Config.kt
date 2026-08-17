@@ -24,6 +24,20 @@ enum class TerminalEncoding(val displayName: String, val charsetName: String) {
     }
 }
 
+/**
+ * 工具页面执行本地指令时的终端会话路由模式
+ */
+enum class ToolCommandSessionMode(val displayName: String) {
+    /** 每次执行都新建一个会话 */
+    NEW("每次新建会话"),
+    /** 所有非用户发起的指令都重定向到同一个"默认"会话 */
+    DEFAULT("使用默认会话");
+
+    companion object {
+        fun fromName(name: String): ToolCommandSessionMode = entries.find { it.name == name } ?: NEW
+    }
+}
+
 data class AppConfig(
     val dark: Boolean = false, 
     val color: String? = null, 
@@ -34,7 +48,9 @@ data class AppConfig(
     // 壁纸相关：不获取桌面壁纸（Linux 上此值不影响显示，始终视为开启）
     val useCustomBg: Boolean = false,
     // 用户自选的本地背景文件名（存放在程序目录 /cardbg/ 下）
-    val customBgFile: String? = null
+    val customBgFile: String? = null,
+    // 工具页面本地指令的终端会话模式（NEW=每次新建 / DEFAULT=使用默认会话）
+    val toolCommandSession: String = "NEW"
 )
 
 private val configPath: Path = Path.of("config", "conf.toml")
@@ -51,6 +67,7 @@ fun loadConfig(): AppConfig {
         var displayName: String? = null
         var useCustomBg: Boolean = false
         var customBgFile: String? = null
+        var toolCommandSession: String = "NEW"
         for (raw in lines) {
             val line = raw.trim()
             if (line.startsWith("#") || line.isEmpty()) continue
@@ -104,9 +121,16 @@ fun loadConfig(): AppConfig {
                     if (v.startsWith("\"") && v.endsWith("\"")) v = v.substring(1, v.length - 1)
                     if (v.isNotBlank()) customBgFile = v
                 }
+            } else if (line.startsWith("tool_command_session")) {
+                val parts = line.split('=', limit = 2)
+                if (parts.size == 2) {
+                    var v = parts[1].trim()
+                    if (v.startsWith("\"") && v.endsWith("\"")) v = v.substring(1, v.length - 1)
+                    if (v.isNotBlank()) toolCommandSession = v
+                }
             }
         }
-        AppConfig(dark = dark, color = color, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, useCustomBg = useCustomBg, customBgFile = customBgFile)
+        AppConfig(dark = dark, color = color, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, useCustomBg = useCustomBg, customBgFile = customBgFile, toolCommandSession = toolCommandSession)
     } catch (e: Exception) {
         AppConfig()
     }
@@ -145,6 +169,7 @@ fun saveConfig(cfg: AppConfig) {
             sb.append("\"\"")
         }
         sb.append('\n')
+        sb.append("tool_command_session = \"").append(cfg.toolCommandSession).append("\"\n")
         Files.writeString(tmp, sb.toString())
         Files.move(tmp, configPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
     } catch (e: Exception) {

@@ -433,7 +433,7 @@ private fun EmptyOfflineHint(isWindows: Boolean, onAddPathClick: () -> Unit, onA
 
 @Composable
 private fun LocalToolCardGrid(items: List<OfflineItem>, onRun: (OfflineItem) -> Unit, onDelete: (OfflineItem) -> Unit, onEdit: (OfflineItem) -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = 8.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         items.chunked(2).forEach { row ->
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 row.forEach { item -> LocalToolCard(item, onRun = { onRun(item) }, onDelete = { onDelete(item) }, onEdit = { onEdit(item) }, modifier = Modifier.weight(1f)) }
@@ -540,7 +540,7 @@ fun ToolCardGrid(
     tools: List<PackageInfo>,
     selectedPackageManager: PackageManagerType = PackageManagerType.UNKNOWN
 ) {
-    Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         tools.chunked(2).forEach { row ->
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 row.forEach { tool -> ToolCard(tool, selectedPackageManager, Modifier.weight(1f)) }
