@@ -50,7 +50,9 @@ data class AppConfig(
     // 用户自选的本地背景文件名（存放在程序目录 /cardbg/ 下）
     val customBgFile: String? = null,
     // 工具页面本地指令的终端会话模式（NEW=每次新建 / DEFAULT=使用默认会话）
-    val toolCommandSession: String = "NEW"
+    val toolCommandSession: String = "NEW",
+    // 终端进程结束后是否立即结束会话（false=等待用户按回车关闭）
+    val closeSessionOnEnd: Boolean = false
 )
 
 private val configPath: Path = Path.of("config", "conf.toml")
@@ -68,6 +70,7 @@ fun loadConfig(): AppConfig {
         var useCustomBg: Boolean = false
         var customBgFile: String? = null
         var toolCommandSession: String = "NEW"
+        var closeSessionOnEnd: Boolean = false
         for (raw in lines) {
             val line = raw.trim()
             if (line.startsWith("#") || line.isEmpty()) continue
@@ -128,9 +131,14 @@ fun loadConfig(): AppConfig {
                     if (v.startsWith("\"") && v.endsWith("\"")) v = v.substring(1, v.length - 1)
                     if (v.isNotBlank()) toolCommandSession = v
                 }
+            } else if (line.startsWith("close_session_on_end")) {
+                val parts = line.split('=', limit = 2)
+                if (parts.size == 2) {
+                    closeSessionOnEnd = parts[1].trim().lowercase() == "true"
+                }
             }
         }
-        AppConfig(dark = dark, color = color, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, useCustomBg = useCustomBg, customBgFile = customBgFile, toolCommandSession = toolCommandSession)
+        AppConfig(dark = dark, color = color, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, useCustomBg = useCustomBg, customBgFile = customBgFile, toolCommandSession = toolCommandSession, closeSessionOnEnd = closeSessionOnEnd)
     } catch (e: Exception) {
         AppConfig()
     }
@@ -170,6 +178,7 @@ fun saveConfig(cfg: AppConfig) {
         }
         sb.append('\n')
         sb.append("tool_command_session = \"").append(cfg.toolCommandSession).append("\"\n")
+        sb.append("close_session_on_end = ").append(if (cfg.closeSessionOnEnd) "true" else "false").append('\n')
         Files.writeString(tmp, sb.toString())
         Files.move(tmp, configPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
     } catch (e: Exception) {

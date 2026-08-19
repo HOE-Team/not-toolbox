@@ -67,7 +67,7 @@ private fun greetingForOverview(customName: String?): String {
 
 @OptIn(ExperimentalMaterial3Api::class)
 fun main() = application {
-    val windowState = rememberWindowState(width = 1280.dp, height = 600.dp)
+    val windowState =  rememberWindowState(width = 1280.dp, height = 600.dp)
     Window(
         onCloseRequest = ::exitApplication,
         title = "NOT Toolbox",
@@ -105,12 +105,17 @@ fun main() = application {
         var customBgFile by remember { mutableStateOf(loaded.customBgFile) }
         // 工具指令会话模式
         var toolCommandSessionMode by remember { mutableStateOf(loaded.toolCommandSession) }
+        // 终端进程结束后是否立即结束会话
+        var closeSessionOnEnd by remember { mutableStateOf(loaded.closeSessionOnEnd) }
 
         // 初始化 TerminalSessionManager 的编码
         TerminalSessionManager.setEncoding(terminalEncoding)
 
         // 初始化 TerminalSessionManager 的会话路由模式
         TerminalSessionManager.setToolCommandSessionMode(ToolCommandSessionMode.fromName(toolCommandSessionMode))
+
+        // 初始化 TerminalSessionManager 的进程结束后会话处理
+        TerminalSessionManager.setCloseSessionOnEnd(closeSessionOnEnd)
 
         // 仅在"使用默认会话"模式下预先创建默认会话并设为活动；"每次新建会话"模式下初始无会话（终端页显示空状态）
         if (ToolCommandSessionMode.fromName(toolCommandSessionMode) == ToolCommandSessionMode.DEFAULT) {
@@ -181,41 +186,41 @@ fun main() = application {
                         isDarkTheme = isDark,
                         onThemeChange = { newDark ->
                             isDark = newDark
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, toolCommandSession = toolCommandSessionMode))
+                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, toolCommandSession = toolCommandSessionMode, closeSessionOnEnd = closeSessionOnEnd))
                         },
                         selectedColor = seedHex ?: "",
                         onColorChange = { hex ->
                             seedHex = if (hex.isBlank()) null else hex
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, toolCommandSession = toolCommandSessionMode))
+                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, toolCommandSession = toolCommandSessionMode, closeSessionOnEnd = closeSessionOnEnd))
                         },
                         selectedPackageManager = selectedPackageManager,
                         onPackageManagerChange = { selectedPackageManager = it },
                         useProxy = useProxy,
                         onUseProxyChange = { newUseProxy ->
                             useProxy = newUseProxy
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, toolCommandSession = toolCommandSessionMode))
+                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, toolCommandSession = toolCommandSessionMode, closeSessionOnEnd = closeSessionOnEnd))
                         },
                         proxyUrl = proxyUrl,
                         onProxyUrlChange = { newProxyUrl ->
                             proxyUrl = newProxyUrl
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, toolCommandSession = toolCommandSessionMode))
+                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, toolCommandSession = toolCommandSessionMode, closeSessionOnEnd = closeSessionOnEnd))
                         },
                         terminalEncoding = terminalEncoding,
                         onTerminalEncodingChange = { newEncoding ->
                             terminalEncoding = newEncoding
                             TerminalSessionManager.setEncoding(newEncoding)
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = newEncoding, toolCommandSession = toolCommandSessionMode))
+                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = newEncoding, toolCommandSession = toolCommandSessionMode, closeSessionOnEnd = closeSessionOnEnd))
                         },
                         displayName = displayName,
                         onDisplayNameChange = { newName ->
                             displayName = newName
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = newName, toolCommandSession = toolCommandSessionMode))
+                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = newName, toolCommandSession = toolCommandSessionMode, closeSessionOnEnd = closeSessionOnEnd))
                         },
                         useCustomBg = useCustomBg,
                         onUseCustomBgChange = { newVal ->
                             useCustomBg = newVal
                             WallpaperState.useCustomBg = newVal
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, useCustomBg = newVal, customBgFile = customBgFile, toolCommandSession = toolCommandSessionMode))
+                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, useCustomBg = newVal, customBgFile = customBgFile, toolCommandSession = toolCommandSessionMode, closeSessionOnEnd = closeSessionOnEnd))
                         },
                         customBgFile = customBgFile,
                         onCustomBgFileChange = { newFile ->
@@ -226,13 +231,19 @@ fun main() = application {
                             }
                             customBgFile = newFile
                             WallpaperState.customBgFileName = newFile
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, useCustomBg = useCustomBg, customBgFile = newFile, toolCommandSession = toolCommandSessionMode))
+                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, useCustomBg = useCustomBg, customBgFile = newFile, toolCommandSession = toolCommandSessionMode, closeSessionOnEnd = closeSessionOnEnd))
                         },
                         toolCommandSessionMode = toolCommandSessionMode,
                         onToolCommandSessionModeChange = { newMode ->
                             toolCommandSessionMode = newMode
                             TerminalSessionManager.setToolCommandSessionMode(ToolCommandSessionMode.fromName(newMode))
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, useCustomBg = useCustomBg, customBgFile = customBgFile, toolCommandSession = newMode))
+                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, useCustomBg = useCustomBg, customBgFile = customBgFile, toolCommandSession = newMode, closeSessionOnEnd = closeSessionOnEnd))
+                        },
+                        closeSessionOnEnd = closeSessionOnEnd,
+                        onCloseSessionOnEndChange = { newVal ->
+                            closeSessionOnEnd = newVal
+                            TerminalSessionManager.setCloseSessionOnEnd(newVal)
+                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, useCustomBg = useCustomBg, customBgFile = customBgFile, toolCommandSession = toolCommandSessionMode, closeSessionOnEnd = newVal))
                         }
                     )
                     4 -> AboutScreen()

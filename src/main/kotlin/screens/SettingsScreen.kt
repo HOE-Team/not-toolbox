@@ -53,7 +53,9 @@ fun SettingsScreen(
     customBgFile: String? = null,
     onCustomBgFileChange: (String?) -> Unit = {},
     toolCommandSessionMode: String = "NEW",
-    onToolCommandSessionModeChange: (String) -> Unit = {}
+    onToolCommandSessionModeChange: (String) -> Unit = {},
+    closeSessionOnEnd: Boolean = false,
+    onCloseSessionOnEndChange: (Boolean) -> Unit = {}
 ) {
     var localDarkTheme by remember { mutableStateOf(isDarkTheme) }
     var hexInput by remember { mutableStateOf(selectedColor) }
@@ -515,45 +517,46 @@ fun SettingsScreen(
             )
         }
 
-        // 代理地址输入
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        // 代理地址输入（仅在开启\"使用GitHub代理\"时显示）
+        if (useProxy) {
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = MaterialSymbols.Http,
-                    contentDescription = "GitHub代理地址",
-                    modifier = Modifier.size(20.dp)
-                )
-                Column {
-                    Text(
-                        text = "代理地址",
-                        style = MaterialTheme.typography.bodyMedium
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = MaterialSymbols.Http,
+                        contentDescription = "GitHub代理地址",
+                        modifier = Modifier.size(20.dp)
                     )
-                    Text(
-                        text = "例如: https://gh-proxy.com",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Column {
+                        Text(
+                            text = "代理地址",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = "例如: https://gh-proxy.com",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
-            }
 
-            var localProxyUrl by remember(proxyUrl) { mutableStateOf(proxyUrl) }
-            TextField(
-                value = localProxyUrl,
-                onValueChange = { localProxyUrl = it; onProxyUrlChange(it) },
-                singleLine = true,
-                placeholder = { Text("https://gh-proxy.com") },
-                modifier = Modifier.width(250.dp),
-                enabled = useProxy
-            )
+                var localProxyUrl by remember(proxyUrl) { mutableStateOf(proxyUrl) }
+                TextField(
+                    value = localProxyUrl,
+                    onValueChange = { localProxyUrl = it; onProxyUrlChange(it) },
+                    singleLine = true,
+                    placeholder = { Text("https://gh-proxy.com") },
+                    modifier = Modifier.width(250.dp)
+                )
+            }
         }
 
         HorizontalDivider(
@@ -564,7 +567,7 @@ fun SettingsScreen(
 
         // 终端编码设置
         Text(
-            text = "终端编码",
+            text = "终端",
             style = MaterialTheme.typography.titleMedium,
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.primary,
@@ -650,14 +653,7 @@ fun SettingsScreen(
             color = DividerDefaults.color
         )
 
-        // 工具指令会话模式设置
-        Text(
-            text = "工具指令会话",
-            style = MaterialTheme.typography.titleMedium,
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(vertical = 12.dp)
-        )
+        // 工具指令会话模式
 
         Row(
             modifier = Modifier
@@ -730,6 +726,50 @@ fun SettingsScreen(
                     }
                 }
             }
+        }
+
+
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 8.dp),
+            thickness = DividerDefaults.Thickness,
+            color = DividerDefaults.color
+        )
+
+        // 终端进程结束后行为
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    imageVector = MaterialSymbols.Terminal2,
+                    contentDescription = "进程结束后",
+                    modifier = Modifier.size(20.dp)
+                )
+                Column {
+                    Text(
+                        text = "进程结束后立即结束会话",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = "关闭后需按回车确认；开启后进程一结束会话即自动关闭",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Switch(
+                checked = closeSessionOnEnd,
+                onCheckedChange = onCloseSessionOnEndChange
+            )
         }
 
         Spacer(modifier = Modifier.height(12.dp))

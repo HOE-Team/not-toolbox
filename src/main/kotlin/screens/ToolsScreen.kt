@@ -11,18 +11,32 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import components.MaterialSymbols
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -658,6 +672,17 @@ fun InstallConfirmationDialog(toolName: String, installCommand: String, onDismis
             AlertDialog(onDismissRequest = {}, title = { Text("正在安装") },
                 text = {
                     Column {
+                        // 内嵌终端的输入状态（PROGRESS 期间持有）
+                        var pendingInput by remember { mutableStateOf("") }
+                        val inputFocusRequester = remember { FocusRequester() }
+                        // 发送输入行到活动会话（运行中的安装命令的 stdin）
+                        val sendPendingInput: () -> Unit = {
+                            if (pendingInput.isNotBlank()) {
+                                TerminalSessionManager.executeCommand(pendingInput)
+                                pendingInput = ""
+                            }
+                        }
+
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -667,19 +692,92 @@ fun InstallConfirmationDialog(toolName: String, installCommand: String, onDismis
                                 containerColor = Color(0xFF1E1E1E) // 深色终端背景
                             )
                         ) {
-                            val scrollState = rememberScrollState()
-                            LaunchedEffect(output) { scrollState.animateScrollTo(scrollState.maxValue) }
-                            Text(
-                                text = annotatedOutput,
+                            Column(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .padding(12.dp)
-                                    .verticalScroll(scrollState),
-                                style = androidx.compose.ui.text.TextStyle(
-                                    fontSize = 12.sp,
-                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                                )
-                            )
+                                    // 拦截 Ctrl+C（通过父级冒泡接收输入框未消费的按键）
+                                    .onKeyEvent { event ->
+                                        if (event.type == KeyEventType.KeyDown &&
+                                            event.key == Key.C && event.isCtrlPressed
+                                        ) {
+                                            TerminalSessionManager.activeSessionId.value?.let {
+                                                TerminalSessionManager.sendRawInput(it, "\u0003")
+                                            }
+                                            true
+                                        } else false
+                                    }
+                            ) {
+                                // 输出区域：点击任意位置将焦点交给输入框
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .weight(1f)
+                                        .clickable { inputFocusRequester.requestFocus() }
+                                ) {
+                                    val scrollState = rememberScrollState()
+                                    LaunchedEffect(output) { scrollState.animateScrollTo(scrollState.maxValue) }
+                                    Text(
+                                        text = annotatedOutput,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(12.dp)
+                                            .verticalScroll(scrollState),
+                                        style = androidx.compose.ui.text.TextStyle(
+                                            fontSize = 12.sp,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                            color = Color(0xFFCCCCCC)
+                                        )
+                                    )
+                                }
+
+                                // 输入行：提示符 + 真正的文本输入框（系统处理 Shift/CapsLock/IME）
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "> ",
+                                        style = androidx.compose.ui.text.TextStyle(
+                                            fontSize = 12.sp,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                            color = Color(0xFFCCCCCC)
+                                        )
+                                    )
+                                    BasicTextField(
+                                        value = pendingInput,
+                                        onValueChange = { pendingInput = it },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .focusRequester(inputFocusRequester),
+                                        textStyle = androidx.compose.ui.text.TextStyle(
+                                            fontSize = 12.sp,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                            color = Color(0xFFCCCCCC)
+                                        ),
+                                        cursorBrush = SolidColor(Color(0xFFCCCCCC)),
+                                        singleLine = true,
+                                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                                        keyboardActions = KeyboardActions(onSend = { sendPendingInput() }),
+                                        decorationBox = { innerTextField ->
+                                            Box(modifier = Modifier.fillMaxWidth()) {
+                                                if (pendingInput.isEmpty()) {
+                                                    Text(
+                                                        text = "向运行中的命令发送输入…",
+                                                        style = androidx.compose.ui.text.TextStyle(
+                                                            fontSize = 12.sp,
+                                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                                            color = Color(0xFF6E6E6E)
+                                                        )
+                                                    )
+                                                }
+                                                innerTextField()
+                                            }
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
                 },

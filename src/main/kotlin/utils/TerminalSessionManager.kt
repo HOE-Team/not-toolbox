@@ -41,6 +41,7 @@ class TerminalSession internal constructor(
     internal val isRunning = MutableStateFlow(false)
     internal val lastExitCode = MutableStateFlow<Int?>(null)
     internal val wasCancelled = MutableStateFlow(false)
+    internal val ended = MutableStateFlow(false) // 进程结束后是否为\"等待关闭\"状态
     internal var shellJob: Job? = null
     internal var commandJob: Job? = null
 }
@@ -83,6 +84,17 @@ object TerminalSessionManager {
     /** 工具页面本地指令的会话路由模式 */
     var toolCommandSessionMode: ToolCommandSessionMode = ToolCommandSessionMode.NEW
         private set
+
+    /** 终端进程结束后是否立即结束会话（false=等待用户按回车关闭） */
+    var closeSessionOnEnd: Boolean = false
+        private set
+
+    /**
+     * 设置进程结束后是否立即结束会话。
+     */
+    fun setCloseSessionOnEnd(value: Boolean) {
+        closeSessionOnEnd = value
+    }
 
     /** 默认会话 ID（供 UI 判断是否为默认会话） */
     val defaultSessionId: Long get() = DEFAULT_SESSION_ID
@@ -289,6 +301,7 @@ object TerminalSessionManager {
             // 使用用户设置的编码
             val processCharset = getCharset()
             s.writer = OutputStreamWriter(process.outputStream, processCharset)
+            s.ended.value = false
             setRunning(s, true)
 
             addOutput(s, "=== 终端会话已启动 ($currentEncodingName) ===\n")
@@ -325,6 +338,9 @@ object TerminalSessionManager {
                 setRunning(s, false)
                 s.process = null
                 s.writer = null
+                // 标记会话已结束；若设置了\"进程结束后立即结束会话\"则自动关闭
+                s.ended.value = true
+                if (closeSessionOnEnd) closeSession(s.id)
             }
         } catch (e: Exception) {
             addOutput(s, "启动终端会话时出错: ${e.message}\n")
@@ -370,6 +386,33 @@ object TerminalSessionManager {
         val id = _activeSessionId.value ?: return false
         return executeCommand(id, command)
     }
+
+    /**
+     * 向指定会话的交互式 Shell 发送原始输入（不附加换行），
+     * 用于发送 Ctrl+C 中断等控制字符。若 Shell 未运行则先启动。
+     */
+    fun sendRawInput(sessionId: Long, text: String): Boolean {
+        val s = getSession(sessionId) ?: return false
+        return try {
+            // 如果 Shell 未运行，先启动
+            if (s.process?.isAlive != true) {
+                startShellSession(s)
+                // 等待 Shell 启动
+                Thread.sleep(200)
+            }
+
+            val writer = s.writer
+            if (writer != null && s.process?.isAlive == true) {
+                writer.write(text)
+                writer.flush()
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
     
     /**
      * 执行命令并等待完成（直接启动进程，不通过交互式 Shell）。
@@ -400,6 +443,7 @@ object TerminalSessionManager {
 
         s.commandJob = CoroutineScope(Dispatchers.IO).launch {
             try {
+                s.ended.value = false
                 setRunning(s, true)
 
                 // 根据平台构建命令
@@ -419,8 +463,10 @@ object TerminalSessionManager {
                 val process = processBuilder.start()
                 s.process = process
 
-                // 使用用户设置的编码读取输出
+                // 使用用户设置的编码读写
                 val processCharset = getCharset()
+                // 连接进程标准输入，使嵌入式终端可向运行中的安装命令发送输入（如确认提示 / 密码）
+                s.writer = OutputStreamWriter(process.outputStream, processCharset)
                 val reader = BufferedReader(InputStreamReader(process.inputStream, processCharset))
 
                 try {
@@ -455,6 +501,9 @@ object TerminalSessionManager {
                 setRunning(s, false)
                 s.process = null
                 s.writer = null
+                // 标记会话已结束；若设置了\"进程结束后立即结束会话\"则自动关闭
+                s.ended.value = true
+                if (closeSessionOnEnd) closeSession(s.id)
             }
         }
     }
@@ -465,6 +514,7 @@ object TerminalSessionManager {
      */
     private fun stopProcess(s: TerminalSession) {
         s.wasCancelled.value = true
+        s.ended.value = true
 
         // 取消执行任务
         s.commandJob?.cancel()

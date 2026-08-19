@@ -7,6 +7,7 @@
 
 package screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -17,6 +18,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -32,24 +35,42 @@ fun AboutScreen() {
         horizontalAlignment = Alignment.Start,
         verticalArrangement = Arrangement.Top
     ) {
-        // 标题
+        // 标题（居中）
         Text(
             text = "NOT Toolbox/“非工具箱”",
             style = MaterialTheme.typography.headlineLarge,
-            textAlign = TextAlign.Start
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
         )
         Spacer(modifier = Modifier.height(8.dp))
+        // 标语（居中）
         Text(
             text = "Network-centric/网络中心化, Open-source/开源, Trans-platform/跨平台",
             style = MaterialTheme.typography.headlineSmall,
-            textAlign = TextAlign.Start,
-            color = MaterialTheme.colorScheme.primary
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.fillMaxWidth()
         )
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+        // 居中 Logo（位于标语下方）
+        Box(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = painterResource("img/logo.png"),
+                contentDescription = "NOT Toolbox Logo",
+                modifier = Modifier.size(120.dp),
+                contentScale = ContentScale.Fit
+            )
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+        // 描述（居中）
         Text(
             text = "一款跨平台、功能强大、去本地化的工具集",
             style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Start
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
         )
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -68,7 +89,7 @@ fun AboutScreen() {
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "版本：O-1.0.6-snap-w33a",
+            text = "版本：O-1.0.6-snap-w34a",
             style = MaterialTheme.typography.bodyMedium
         )
 
