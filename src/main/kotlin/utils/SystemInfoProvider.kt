@@ -562,9 +562,19 @@ object SystemInfoProvider {
                     // isCharging can be unreliable on some platforms, so combine
                     // it with powerOnLine for a more robust detection.
                     cachedIsCharging = ps.isPowerOnLine || ps.isCharging
-                    // OSHI's remainingCapacityPercent is a fraction in [0.0, 1.0]
-                    // representing 0-100%. Convert to a 0-100 percentage for display.
-                    val frac = ps.remainingCapacityPercent
+                    // OSHI's remainingCapacityPercent is a fraction in [0.0, 1.0].
+                    // HOWEVER on Windows it is computed solely from SystemBatteryState
+                    // (CallNtPowerInformation): it defaults to 1.0 when the call fails,
+                    // and Windows usually reports remainingCapacity == maxCapacity (or
+                    // maxCapacity == 0 → Infinity, capped to 1.0), so it is stuck at 100%.
+                    // The accurate values read via DeviceIoControl (BATTERY_STATUS.Capacity
+                    // / BATTERY_INFORMATION.FullChargedCapacity) are exposed as
+                    // currentCapacity/maxCapacity in the SAME units, so derive the
+                    // percentage from their ratio, keeping remainingCapacityPercent as a
+                    // cross-platform fallback when the capacities are unavailable.
+                    val maxCap = ps.maxCapacity.toDouble()
+                    val curCap = ps.currentCapacity.toDouble()
+                    val frac = if (maxCap > 0 && curCap >= 0) curCap / maxCap else ps.remainingCapacityPercent
                     cachedCapacityPercent = if (frac in 0.0..1.0) frac * 100.0 else frac
                     cachedCapacityPercent = cachedCapacityPercent.coerceIn(0.0, 100.0)
                     cachedCycleCount = ps.cycleCount.takeIf { it >= 0 } ?: 0
