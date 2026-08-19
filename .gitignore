@@ -38,3 +38,6 @@ replay_pid*
 
 # MT Manager
 *.bak
+
+# Local MCP server config (contains API keys / machine-specific paths)
+.mcp.json

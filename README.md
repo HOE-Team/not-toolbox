@@ -15,6 +15,9 @@
 
 </div>
 
+> [!NOTE]
+> 我们诚挚的邀请您参与我们的生态建设，欢迎通过Issue、Pull Request协助我们开发NOT Toolbox及[资源仓库](https://github.com/HOE-Team/not-toolbox-resource)，我们将不胜感激。
+
 
 ## 📑 目录
 
@@ -33,6 +36,7 @@
 
 * **Linux\Win跨平台**：支持Windows 10+与主流Linux发行版
 * **包管理器集成**：自动检测系统包管理器（APT、DNF、PACMAN、ZYPPER、SCOOP、WINGET等）
+* **终端功能集成**: 集成终端模拟器，支持多会话管理
 * **现代UI**：采用 Material Design 3 设计风格
 * **极佳可迁移性**：使用 Kotlin + Compose Multiplatform 跨平台框架
 * **代码透明**：完全开源，可供任何人审计
@@ -48,13 +52,13 @@ Windows 10 1507+（内部版本 10240），需要至少存在一种包管理器�
 
 * **Java环境**：Java 21 或更高版本
 * **网络**：需要稳定网络连接（用于包管理器操作）
-* **权限**：Linux平台上部分功能（如包管理器安装）需要sudo权限，在Windows需要用户同意UAC（由包管理器发起，NOT Toolbox程序不提升权限）
+* **权限**：Linux平台上需要sudo权限，否则将无法使用大部分功能，在Windows需要用户同意UAC（由包管理器发起，NOT Toolbox程序不提升权限）
 
 ## 🚀 安装和运行
 ### 使用启动器(Windows)或启动脚本(Linux)
 **Windows**
 1. 从 [Releases](https://github.com/HOE-Team/not-toolbox/releases) 下载`NTB.exe`
-2. 运行并安装
+2. 运行并安装（若未安装Java21会自动跳转至TUNA下载JRE 21安装包，安装即可）
 3. 点击快捷方式通过启动器快速启动NOT Toolbox
 
 **Linux**
@@ -86,9 +90,13 @@ cd not-toolbox
 
 # 构建可执行JAR
 ./gradlew fatJar
+# 或构建一个经过R8压缩的包
+./gradle shrinkJar
 
 # 运行应用程序
 java -jar build/libs/NTB-all.jar
+# 或
+java -jar build/libs/NTB-shrunk.jar
 ```
 
 ## 📦 JAR分发说明
@@ -180,6 +188,11 @@ not-toolbox/
 | [Compose Multiplatform](https://kotlinlang.org/compose-multiplatform/) | 跨平台声明式 UI 框架 | Apache 2.0 |
 | [OSHI](https://github.com/oshi/oshi) | 操作系统和硬件信息获取 | MIT |
 | [Ktor](https://ktor.io) | 异步网络框架 | Apache 2.0 |
+| [Gradle(Kotlin DSL)](https://gradle.org/) | 编译工具 | GPL 2.0 |
+| [Skiko](https://github.com/JetBrains/skiko) | 渲染库 | Apache 2.0 |
+| [Python](https://python.org) | Windows启动器使用语言 | PSF 2.0 |
+| [PyInstaller](https://pyinstaller.org) | 启动器打包工具 | GPL 2.0 |
+| [Inno Setup](https://jrsoftware.org/isdl.php) | Windows平台安装程序打包工具 | Inno Setup License |
 
 ## 📬 联系方式
 
@@ -190,6 +203,8 @@ not-toolbox/
 ## 🔨 开发人员内容
 ### Debug常量
 将此变量改为“true”启用调试，程序将使用本地存储的Packages Lists而不是从远程拉取。  
+> [!WARNING]
+> 非调试用途不建议修改变量，因为本地调试包列表不是最新的且质量不佳。 
 
 `MainApp.kt:`
 ```kotlin

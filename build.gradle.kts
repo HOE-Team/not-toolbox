@@ -2,9 +2,10 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import java.io.File
 
 plugins {
-    kotlin("jvm") version "1.9.23"
-    kotlin("plugin.serialization") version "1.9.23"
-    id("org.jetbrains.compose") version "1.6.1"
+    kotlin("jvm") version "2.4.0"
+    kotlin("plugin.serialization") version "2.4.0"
+    id("org.jetbrains.kotlin.plugin.compose") version "2.4.0"
+    id("org.jetbrains.compose") version "1.11.1"
 }
 
 // 专用于 R8（构建期）的依赖配置，不会打进应用运行时 classpath
@@ -18,27 +19,24 @@ repositories {
 
 dependencies {
     // R8 代码压缩器（仅构建期使用）
-    r8Configuration("com.android.tools:r8:8.3.37")
+    r8Configuration("com.android.tools:r8:8.13.19")
 
     // 跨平台 Compose Desktop 依赖
     implementation(compose.desktop.common)
     
-    // 包含所有平台的 Skiko 原生库，确保 fat JAR 在任何系统上都能运行
+    // 包含Win/Linux的 Skiko 原生库，确保 fat JAR 在目标系统上可以运行
     implementation(compose.desktop.linux_x64)
     implementation(compose.desktop.windows_x64)
-    implementation(compose.desktop.macos_x64)
-    implementation(compose.desktop.macos_arm64)
     
-    implementation("org.jetbrains.compose.material3:material3:1.6.1")
-    implementation("com.github.oshi:oshi-core:6.4.10")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation(compose.material3)
+    implementation("com.github.oshi:oshi-core:7.3.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
     // Ktor 网络客户端
-    implementation("io.ktor:ktor-client-core:2.3.7")
-    implementation("io.ktor:ktor-client-cio:2.3.7")
-    implementation("io.ktor:ktor-client-content-negotiation:2.3.7")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.7")
+    implementation("io.ktor:ktor-client-core:3.5.2")
+    implementation("io.ktor:ktor-client-cio:3.5.2")
+    implementation("io.ktor:ktor-client-content-negotiation:3.5.2")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:3.5.2")
 }
 
 kotlin {
