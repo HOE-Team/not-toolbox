@@ -1,4 +1,6 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.gradle.jvm.toolchain.JavaLanguageVersion
+import org.gradle.jvm.toolchain.JvmVendorSpec
 import java.io.File
 
 plugins {
@@ -8,8 +10,8 @@ plugins {
     id("org.jetbrains.compose") version "1.11.1"
 }
 
-// 专用于 R8（构建期）的依赖配置，不会打进应用运行时 classpath
-val r8Configuration = configurations.create("r8")
+// 专用于 ProGuard（构建期）的依赖配置，不会打进应用运行时 classpath
+val proguardConfiguration = configurations.create("proguard")
 
 repositories {
     google()
@@ -18,8 +20,8 @@ repositories {
 }
 
 dependencies {
-    // R8 代码压缩器（仅构建期使用）
-    r8Configuration("com.android.tools:r8:8.13.19")
+    // ProGuard 压缩器（仅构建期使用）
+    proguardConfiguration("com.guardsquare:proguard-base:7.9.1")
 
     implementation("org.jetbrains.compose.desktop:desktop:1.11.1")
     implementation("org.jetbrains.compose.ui:ui:1.11.1")
@@ -108,68 +110,58 @@ tasks.register("packageApp") {
 }
 
 // ===========================================================================
-// R8：只压缩（shrink），不混淆（不混淆 = 不重命名类/方法/字段）
-// 通过 --classfile 输出 Java 字节码（而非 Android DEX），
-// 因此适用于 JVM / Compose Desktop 应用。
+// ProGuard：只压缩（shrink），不混淆（obfuscate）、不优化（optimize）。
+// 相比 R8，ProGuard 在仅压缩（-dontoptimize -dontobfuscate）时不会改写
+// Compose 接口默认方法，可避免 R8 生成的 access$...$jd 非法字节码
+// （VerifyError: Bad invokespecial，见 JetBrains CMP-8339 / CMP-10256）。
 // 用法：./gradlew shrinkJar
 // ===========================================================================
 
-// R8 的 ProGuard 规则文件（含 -dontobfuscate 及必要 keep 规则）
-val r8RulesFile = file("r8-rules.pro")
-
-// R8 输出的压缩后 class 目录
-val shrinkClassesDir = layout.buildDirectory.dir("r8/classes")
+// ProGuard 规则文件（含 -dontobfuscate、-dontoptimize 及必要 keep 规则）
+val proguardRulesFile = file("proguard-rules.pro")
 
 // 原始 fat JAR（由 fatJar 生成，含全部依赖与资源）
 val fatJarFile = layout.buildDirectory.file("libs/${project.name}-all.jar")
 
-// 1) 调用 R8 压缩 class（只压缩、不混淆）
-tasks.register<JavaExec>("shrinkClasses") {
+// ProGuard 输出的压缩 JAR
+val proguardJarFile = layout.buildDirectory.file("libs/${project.name}-shrunk.jar")
+
+// 调用 ProGuard 压缩 fat JAR（只压缩、不混淆、不优化）
+tasks.register<JavaExec>("shrinkJar") {
     group = "distribution"
-    description = "Run R8 to shrink fat JAR class files (minify only, no obfuscation)"
+    description = "Create shrunk fat JAR via ProGuard (shrink only, no obfuscation)"
     dependsOn("fatJar")
 
-    // 使用上面定义的 r8 依赖配置（不污染应用运行时 classpath）
-    classpath = r8Configuration
-    mainClass.set("com.android.tools.r8.R8")
+    // 使用上面定义的 proguard 依赖配置（不污染应用运行时 classpath）
+    classpath = proguardConfiguration
+    mainClass.set("proguard.ProGuard")
     workingDir(projectDir)
 
     inputs.file(fatJarFile)
-    inputs.file(r8RulesFile)
-    outputs.dir(shrinkClassesDir)
+    inputs.file(proguardRulesFile)
+    outputs.file(proguardJarFile)
 
     doFirst {
-        shrinkClassesDir.get().asFile.mkdirs()
-    }
-
-    args(
-        "--classfile",
-        "--output", shrinkClassesDir.get().asFile.absolutePath,
-        "--lib", System.getProperty("java.home"),
-        "--pg-conf", r8RulesFile.absolutePath,
-        fatJarFile.get().asFile.absolutePath
-    )
-}
-
-// 2) 把压缩后的 class 打包成 JAR，并把原始 fat JAR 中的资源（img/、packages/、
-//    原生库等）合并回来 —— R8 的 --classfile 输出不会自动携带资源文件。
-tasks.register<Jar>("shrinkJar") {
-    group = "distribution"
-    description = "Create shrunk fat JAR via R8 (minify only, no obfuscation)"
-    dependsOn("shrinkClasses")
-
-    archiveClassifier.set("shrunk")
-
-    // R8 输出的压缩后 class
-    from(shrinkClassesDir)
-    // 原始 fat JAR 中的非 class 资源
-    from(zipTree(fatJarFile)) {
-        exclude("**/*.class")
-    }
-
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-
-    manifest {
-        attributes["Main-Class"] = "main.kotlin.MainAppKt"
+        // 动态生成 ProGuard 配置：把 fat JAR 作为 injars，JDK 各 jmod 作为 libraryjars。
+        // Gradle daemon 可能运行在 JRE（无 jmods），因此解析工具链 JDK（JDK 21）。
+        // 用 vendor=Microsoft 排除 Temurin JRE，确保解析到带 jmods 的完整 JDK。
+        val jdkHome = javaToolchains.launcherFor {
+            languageVersion.set(JavaLanguageVersion.of(21))
+            vendor.set(JvmVendorSpec.MICROSOFT)
+        }.get().metadata.installationPath.asFile
+        val cfg = layout.buildDirectory.file("proguard/config.pro").get().asFile
+        cfg.parentFile.mkdirs()
+        val sb = StringBuilder()
+        sb.appendLine("-injars '${fatJarFile.get().asFile.absolutePath}'")
+        sb.appendLine("-outjars '${proguardJarFile.get().asFile.absolutePath}'")
+        val jmodsDir = File(jdkHome, "jmods")
+        if (jmodsDir.isDirectory) {
+            jmodsDir.listFiles { f -> f.extension == "jmod" }
+                ?.sortedBy { it.name }
+                ?.forEach { sb.appendLine("-libraryjars '${it.absolutePath}'") }
+        }
+        sb.appendLine("-include '${proguardRulesFile.absolutePath}'")
+        cfg.writeText(sb.toString())
+        args("@${cfg.absolutePath}")
     }
 }
