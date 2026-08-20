@@ -156,7 +156,7 @@ fun TerminalScreen() {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
         // 标签页行：每个标签页内部带有各自的关闭按钮
-        TabRow(
+        PrimaryTabRow(
             selectedTabIndex = activeIndex,
             modifier = Modifier.fillMaxWidth()
         ) {

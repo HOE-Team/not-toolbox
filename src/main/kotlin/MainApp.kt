@@ -30,7 +30,9 @@ import config.saveConfig
 import config.AppConfig
 import config.WallpaperState
 import config.ToolCommandSessionMode
-import androidx.compose.ui.res.painterResource
+import ntb.generated.resources.Res
+import ntb.generated.resources.logo
+import org.jetbrains.compose.resources.painterResource
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.rememberWindowState
@@ -71,7 +73,7 @@ fun main() = application {
     Window(
         onCloseRequest = ::exitApplication,
         title = "NOT Toolbox",
-        icon = painterResource("img/logo.png"),
+        icon = painterResource(Res.drawable.logo),
         state = windowState
     ) {
         val density = LocalDensity.current

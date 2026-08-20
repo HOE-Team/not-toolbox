@@ -56,3 +56,30 @@
 -dontwarn org.jetbrains.skia.**
 -dontwarn org.slf4j.**
 -dontwarn okhttp3.internal.platform.**
+# =============================================================================
+# Compose UI / 运行时 — 防止 R8 移除必需的类
+# =============================================================================
+
+# 保留所有 Compose 核心类
+-keep class androidx.compose.** { *; }
+-keep class org.jetbrains.compose.** { *; }
+
+# 保留 Compose 注解，确保运行时能识别 @Composable 等
+-keep @androidx.compose.runtime.Composable class * { *; }
+-keep @androidx.compose.runtime.Stable class * { *; }
+-keep @androidx.compose.runtime.Immutable class * { *; }
+-keep @androidx.compose.runtime.ComposableTarget class * { *; }
+
+# 特别保留字体加载器（报错类）
+-keep class androidx.compose.ui.text.font.PlatformFontLoader { *; }
+-keep class androidx.compose.ui.text.font.** { *; }
+
+# 保留 Compose 内部使用的 Kotlin 反射
+-keep class kotlin.reflect.** { *; }
+-keep class kotlin.Metadata { *; }
+
+# 保留 Compose 运行时需要的内部类
+-keep class androidx.compose.runtime.** { *; }
+-keep class androidx.compose.ui.** { *; }
+-keep class androidx.compose.foundation.** { *; }
+-keep class androidx.compose.material3.** { *; }

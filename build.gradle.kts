@@ -21,14 +21,21 @@ dependencies {
     // R8 代码压缩器（仅构建期使用）
     r8Configuration("com.android.tools:r8:8.13.19")
 
-    // 跨平台 Compose Desktop 依赖
-    implementation(compose.desktop.common)
-    
-    // 包含Win/Linux的 Skiko 原生库，确保 fat JAR 在目标系统上可以运行
-    implementation(compose.desktop.linux_x64)
-    implementation(compose.desktop.windows_x64)
-    
-    implementation(compose.material3)
+    implementation("org.jetbrains.compose.desktop:desktop:1.11.1")
+    implementation("org.jetbrains.compose.ui:ui:1.11.1")
+    implementation("org.jetbrains.compose.ui:ui-tooling:1.11.1")
+    implementation("org.jetbrains.compose.foundation:foundation:1.11.1")
+    implementation("org.jetbrains.compose.material3:material3:1.11.0-alpha07")
+    implementation("org.jetbrains.compose.runtime:runtime:1.11.1")
+    implementation("org.jetbrains.compose.animation:animation:1.11.1")
+    // Compose Multiplatform 1.11.1 对应的 skiko 版本（0.144.x）。
+    // 注意：不能显式固定为旧版（如 0.8.x），否则与 Compose/Skiko 原生运行时不匹配。
+    implementation("org.jetbrains.skiko:skiko-awt:0.144.6")
+    // Skiko 原生运行时库（Windows/Linux），否则 fat JAR 缺少 skiko-*.dll/.so 会无法启动
+    implementation("org.jetbrains.skiko:skiko-awt-runtime-windows-x64:0.144.6")
+    implementation("org.jetbrains.skiko:skiko-awt-runtime-linux-x64:0.144.6")
+    // Compose 资源库（生成 Res 类，替换弃用的 painterResource(String)）
+    implementation("org.jetbrains.compose.components:components-resources:1.11.1")
     implementation("com.github.oshi:oshi-core:7.3.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")

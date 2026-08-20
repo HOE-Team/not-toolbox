@@ -363,8 +363,9 @@ object SystemInfoProvider {
 
         val cpuUsage = try {
             val ticks = processor.systemCpuLoadTicks
-            val usage = if (prevCpuTicks != null) {
-                val u = processor.getSystemCpuLoadBetweenTicks(prevCpuTicks) * 100.0
+            val prev = prevCpuTicks // 先存入局部变量，避免对可变属性的智能转换（Kotlin 2.4）
+            val usage = if (prev != null) {
+                val u = processor.getSystemCpuLoadBetweenTicks(prev) * 100.0
                 prevCpuTicks = ticks
                 u
             } else {

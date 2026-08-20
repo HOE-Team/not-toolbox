@@ -25,8 +25,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import utils.SystemOverview
 import java.io.File
-import java.io.FileInputStream
-import androidx.compose.ui.res.loadImageBitmap
+import androidx.compose.ui.graphics.decodeToImageBitmap
 
 @Composable
 fun SystemOverviewCard(
@@ -58,9 +57,7 @@ fun SystemOverviewCard(
                     try {
                         val f = File(p)
                         if (f.exists()) {
-                            val stream = FileInputStream(f)
-                            bmp = loadImageBitmap(stream)
-                            stream.close()
+                            bmp = f.readBytes().decodeToImageBitmap()
                         }
                     } catch (_: Exception) {
                         bmp = null
@@ -73,7 +70,7 @@ fun SystemOverviewCard(
                         val res = Thread.currentThread().contextClassLoader?.getResourceAsStream(fallbackName)
                             ?: ClassLoader.getSystemClassLoader().getResourceAsStream(fallbackName)
                         if (res != null) {
-                            val loaded = loadImageBitmap(res)
+                            val loaded = res.readBytes().decodeToImageBitmap()
                             res.close()
                             loaded
                         } else null

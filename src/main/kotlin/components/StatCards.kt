@@ -255,7 +255,10 @@ fun DiskStatCard(
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Text(text = "${disk.name} - ${disk.model}", style = MaterialTheme.typography.bodySmall)
                         Spacer(modifier = Modifier.height(6.dp))
-                        LinearProgressIndicator(((disk.usage / 100.0).toFloat()), modifier = Modifier.fillMaxWidth())
+                        LinearProgressIndicator(
+                            progress = { (disk.usage / 100.0).toFloat() },
+                            modifier = Modifier.fillMaxWidth()
+                        )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = String.format(Locale.getDefault(), "%.2f GB / %.2f GB", disk.usedGB, disk.totalGB),

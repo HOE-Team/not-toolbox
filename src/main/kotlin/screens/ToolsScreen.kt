@@ -237,7 +237,7 @@ fun ToolsScreen(
             }
         } else {
             // 非搜索模式：显示一级 Tabs
-            TabRow(selectedTabIndex = sourceTab, modifier = Modifier.fillMaxWidth()) {
+            PrimaryTabRow(selectedTabIndex = sourceTab, modifier = Modifier.fillMaxWidth()) {
                 Tab(
                     selected = sourceTab == 0,
                     onClick = { sourceTab = 0 },
@@ -255,7 +255,7 @@ fun ToolsScreen(
             if (sourceTab == 0 && showOnline) {
                 // 联机模式
                 if (categories.isNotEmpty()) {
-                    TabRow(selectedTabIndex = selectedTab, modifier = Modifier.fillMaxWidth()) {
+                    PrimaryTabRow(selectedTabIndex = selectedTab, modifier = Modifier.fillMaxWidth()) {
                         categories.forEachIndexed { index, title ->
                             Tab(selected = selectedTab == index, onClick = { selectedTab = index }, text = { Text(title, fontSize = 12.sp) })
                         }
