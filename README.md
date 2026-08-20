@@ -90,7 +90,7 @@ cd not-toolbox
 
 # 构建可执行JAR
 ./gradlew fatJar
-# 或构建一个经过R8压缩的包
+# 或构建一个经过ProGuard压缩的包
 ./gradle shrinkJar
 
 # 运行应用程序
