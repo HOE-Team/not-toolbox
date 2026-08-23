@@ -25,6 +25,10 @@ object SystemInfoProvider {
         // Pre-start bluetooth detection immediately so the card is visible on
         // the very first render (instead of appearing after a few seconds).
         refreshBluetoothAsync()
+        // Pre-start present-GPU detection so the "已安装的GPU" card is correct
+        // from the first render (without it, the first frame may briefly show
+        // ghost GPUs before the background refresh completes).
+        refreshPresentGpusAsync()
     }
 
     private fun detectMemFreqAsync() {
@@ -215,6 +219,19 @@ object SystemInfoProvider {
     private var wifiLastRefreshNanos = 0L
     private val WIFI_REFRESH_INTERVAL_NANOS = 10_000_000_000L  // every 10s
 
+    // Set of GPU display names that are currently present (Windows only).
+    // OSHI's hardware.graphicsCards reads the registry class key for display
+    // adapters, which retains a "ghost" entry for every GPU ever installed on
+    // the machine — even after the card is physically removed. We therefore
+    // cross-reference against the PnP "Display" class and keep only the cards
+    // that are currently present (Status OK/Started; non-present ghosts report
+    // "Unknown"). Refreshed on a background thread because GPU hardware is
+    // essentially static and calling PowerShell from the UI thread would block.
+    @Volatile
+    private var cachedPresentGpus: Set<String> = emptySet()
+    private var gpuPresentRefreshNanos = 0L
+    private val GPU_PRESENT_REFRESH_INTERVAL_NANOS = 30_000_000_000L  // every 30s
+
     private fun refreshWifiSsid() {
         val os = System.getProperty("os.name").lowercase()
         try {
@@ -353,6 +370,50 @@ object SystemInfoProvider {
         )
     }
 
+    // Start present-GPU detection on a background thread (non-blocking).
+    private fun refreshPresentGpusAsync() {
+        thread(start = true, isDaemon = true) { refreshPresentGpus() }
+    }
+
+    // Populate cachedPresentGpus with the display names of GPUs that are
+    // currently present on the system. On Windows, ghost devices (GPUs that
+    // were installed in the past but are no longer present) report a PnP Status
+    // of "Unknown", while present devices report "OK"/"Started". Only overwrite
+    // the cache with a non-empty result so a transient query failure never
+    // hides real GPUs. On non-Windows systems OSHI's list is already accurate.
+    private fun refreshPresentGpus() {
+        val os = System.getProperty("os.name").lowercase()
+        if (!os.contains("windows")) return
+        try {
+            val out = executeCommandUtf8(
+                "Get-PnpDevice -Class Display | " +
+                    "Where-Object { \$_.Status -eq 'OK' -or \$_.Status -eq 'Started' } | " +
+                    "ForEach-Object { \$_.FriendlyName }"
+            )
+            val names = out.lineSequence()
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+                .toSet()
+            if (names.isNotEmpty()) cachedPresentGpus = names
+        } catch (_: Exception) {
+        }
+    }
+
+    // Normalize a GPU name for tolerant comparison (trim, lowercase, collapse
+    // runs of whitespace) because OSHI and PnP may differ slightly in spelling.
+    private fun normalizeGpuName(name: String): String =
+        name.trim().lowercase().replace(Regex("\\s+"), " ")
+
+    // Lenient equality: identical after normalization, or one is contained in
+    // the other. Falls back to containment so minor vendor-string differences
+    // don't cause a genuinely-present GPU to be filtered out.
+    private fun gpuNamesMatch(a: String, b: String): Boolean {
+        val na = normalizeGpuName(a)
+        val nb = normalizeGpuName(b)
+        if (na.isEmpty() || nb.isEmpty()) return false
+        return na == nb || na.contains(nb) || nb.contains(na)
+    }
+
     fun getSystemInfo(): SystemInfoSnapshot {
         // CPU
         val processor = hardware.processor
@@ -398,8 +459,23 @@ object SystemInfoProvider {
         )
 
         // GPU
+        // OSHI's hardware.graphicsCards on Windows reads the registry class key
+        // for display adapters, which retains a "ghost" entry for every GPU ever
+        // installed — even after the card is removed. This made the "已安装的GPU"
+        // card list several GPUs when only one is present. We refresh the set of
+        // currently-present PnP display devices on a background thread and keep
+        // only cards that match. If the present set is empty (non-Windows or the
+        // query failed), we fall back to OSHI's full list rather than hiding GPUs.
+        val nowNanos = System.nanoTime()
+        if (nowNanos - gpuPresentRefreshNanos > GPU_PRESENT_REFRESH_INTERVAL_NANOS) {
+            gpuPresentRefreshNanos = nowNanos
+            refreshPresentGpusAsync()
+        }
+        val presentGpuNames = cachedPresentGpus
         val gpus = hardware.graphicsCards.map { card ->
             GPUInfo(model = card.name ?: "Unknown GPU", driverVersion = "N/A", usage = 0.0, memoryUsed = 0L, memoryTotal = 0L)
+        }.filter { gpu ->
+            presentGpuNames.isEmpty() || presentGpuNames.any { present -> gpuNamesMatch(gpu.model, present) }
         }
 
         // Disks: map fileStores to diskStores via partition mount points (avoid external commands)
