@@ -211,26 +211,14 @@ fun GPUStatCard(
                 // Multiple GPUs - show all model names
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     gpus.forEach { gpu ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant
-                            )
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Text(
-                                    text = gpu.model,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    maxLines = 2
-                                )
-                            }
-                        }
+                        Text(
+                            text = gpu.model,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2
+                        )
                     }
                 }
             }
@@ -337,11 +325,12 @@ fun NetworkAdapterCard(
     network: utils.NetworkIOInfo,
     modifier: Modifier = Modifier
 ) {
-    // Connection-type icon: WiFi → NetworkWifi, wired ethernet → SettingsEthernet,
-    // anything else (bluetooth / unknown) keeps the Router symbol.
-    val connectionIcon = when {
-        !network.ssid.isNullOrBlank() -> MaterialSymbols.NetworkWifi
-        !network.ipv4.isNullOrBlank() && !network.nicName.isNullOrBlank() -> MaterialSymbols.SettingsEthernet
+    // Connection-type icon: WiFi → NetworkWifi, cellular/LTE → SignalCellular3Bar,
+    // wired ethernet → SettingsEthernet, anything else (bluetooth / unknown) keeps Router.
+    val connectionIcon = when (network.connectionType) {
+        utils.NetworkConnectionType.WIFI -> MaterialSymbols.NetworkWifi
+        utils.NetworkConnectionType.CELLULAR -> MaterialSymbols.SignalCellular3Bar
+        utils.NetworkConnectionType.ETHERNET -> MaterialSymbols.SettingsEthernet
         else -> MaterialSymbols.Router
     }
     StatCard(
@@ -354,6 +343,13 @@ fun NetworkAdapterCard(
                 if (!network.ssid.isNullOrBlank()) {
                     Text(
                         text = "WiFi: ${network.ssid}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                // Cellular operator (if connected via LTE/cellular)
+                if (network.connectionType == utils.NetworkConnectionType.CELLULAR && !network.operatorName.isNullOrBlank()) {
+                    Text(
+                        text = "运营商: ${network.operatorName}",
                         style = MaterialTheme.typography.bodySmall
                     )
                 }

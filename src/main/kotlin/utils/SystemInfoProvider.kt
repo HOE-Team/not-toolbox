@@ -29,6 +29,9 @@ object SystemInfoProvider {
         // from the first render (without it, the first frame may briefly show
         // ghost GPUs before the background refresh completes).
         refreshPresentGpusAsync()
+        // Pre-start cellular/LTE detection so the network icon and operator are
+        // correct from the first render.
+        refreshCellularAsync()
     }
 
     private fun detectMemFreqAsync() {
@@ -232,6 +235,19 @@ object SystemInfoProvider {
     private var gpuPresentRefreshNanos = 0L
     private val GPU_PRESENT_REFRESH_INTERVAL_NANOS = 30_000_000_000L  // every 30s
 
+    // Cellular / LTE detection state (Windows only). Cached and refreshed on a
+    // background thread because getNetworkIO() runs on the UI thread and calling
+    // `netsh mbn` synchronously every second would block it. Determined via
+    // `netsh mbn show interfaces`: if a Mobile Broadband interface reports
+    // "State : Connected", the machine is currently using a cellular network, and
+    // that interface's "Provider Name" is the network operator.
+    @Volatile
+    private var cachedCellularConnected = false
+    @Volatile
+    private var cachedOperatorName: String? = null
+    private var cellularRefreshNanos = 0L
+    private val CELLULAR_REFRESH_INTERVAL_NANOS = 30_000_000_000L  // every 30s
+
     private fun refreshWifiSsid() {
         val os = System.getProperty("os.name").lowercase()
         try {
@@ -323,6 +339,52 @@ object SystemInfoProvider {
         }
     }
 
+    // Start cellular/LTE detection on a background thread (non-blocking).
+    private fun refreshCellularAsync() {
+        thread(start = true, isDaemon = true) { refreshCellular() }
+    }
+
+    // Detect whether the machine is currently using a cellular (LTE/WWAN)
+    // network and, if so, the network operator. On Windows, `netsh mbn show
+    // interfaces` lists every Mobile Broadband interface with its connect State
+    // and Provider Name; a "Connected" interface means cellular is in use. On
+    // non-Windows systems there is no mobile broadband concept, so we skip.
+    // Any parse/query failure leaves the cached flags untouched (safe defaults).
+    private fun refreshCellular() {
+        val os = System.getProperty("os.name").lowercase()
+        if (!os.contains("windows")) return
+        try {
+            val out = executeCommandUtf8("netsh mbn show interfaces")
+            var blockConnected = false
+            var foundConnected = false
+            var connectedProvider: String? = null
+            for (rawLine in out.lineSequence()) {
+                val line = rawLine.trim()
+                if (line.isEmpty()) continue
+                val idx = line.indexOf(':')
+                if (idx <= 0) continue
+                val key = line.substring(0, idx).trim().lowercase()
+                val value = line.substring(idx + 1).trim()
+                when {
+                    key == "name" || key == "interface name" -> {
+                        // Start of a new interface block; reset block-local state.
+                        blockConnected = false
+                    }
+                    key == "state" -> {
+                        blockConnected = value.equals("connected", ignoreCase = true)
+                        if (blockConnected) foundConnected = true
+                    }
+                    key == "provider name" -> {
+                        if (blockConnected && value.isNotEmpty()) connectedProvider = value
+                    }
+                }
+            }
+            cachedCellularConnected = foundConnected
+            cachedOperatorName = connectedProvider
+        } catch (_: Exception) {
+        }
+    }
+
     fun getNetworkIO(): NetworkIOInfo {
         val now = System.nanoTime()
 
@@ -332,6 +394,23 @@ object SystemInfoProvider {
             refreshNetworkIdentity()
             wifiLastRefreshNanos = now
         }
+
+        // Periodically refresh cellular/LTE detection on a background thread
+        // (never blocking the UI thread).
+        if (now - cellularRefreshNanos > CELLULAR_REFRESH_INTERVAL_NANOS) {
+            cellularRefreshNanos = now
+            refreshCellularAsync()
+        }
+
+        // Resolve the active connection type. WiFi (SSID) takes precedence, then
+        // cellular, then a plain wired IPv4 connection, else none/other.
+        val connectionType = when {
+            !cachedSSID.isNullOrBlank() -> NetworkConnectionType.WIFI
+            cachedCellularConnected -> NetworkConnectionType.CELLULAR
+            !cachedIPv4.isNullOrBlank() && !cachedNICName.isNullOrBlank() -> NetworkConnectionType.ETHERNET
+            else -> NetworkConnectionType.OTHER
+        }
+        val operatorName = cachedOperatorName.takeIf { connectionType == NetworkConnectionType.CELLULAR }
 
         // Accumulate raw counters across all interfaces
         var rx = 0L
@@ -366,7 +445,9 @@ object SystemInfoProvider {
             ipv4 = cachedIPv4,
             nicName = cachedNICName,
             mac = cachedMAC,
-            adapters = cachedAdapters
+            adapters = cachedAdapters,
+            connectionType = connectionType,
+            operatorName = operatorName
         )
     }
 

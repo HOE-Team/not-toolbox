@@ -192,4 +192,7 @@ object MaterialSymbols {
 
     /**Wallpaper**/
     val Wallpaper: ImageVector = wallpaper
+
+    /**Signal Cellular 3 Bar**/
+    val SignalCellular3Bar = signal_cellular_3_bar
 }

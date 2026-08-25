@@ -41,6 +41,9 @@ data class DiskInfo(
     val usage: Double // percentage 0-100
 )
 
+/** 当前主网络连接的类型，用于选择对应的网络图标。 */
+enum class NetworkConnectionType { NONE, WIFI, ETHERNET, CELLULAR, OTHER }
+
 data class NetworkIOInfo(
     val downKBps: Double,  // download speed KB/s
     val upKBps: Double,  // upload speed KB/s
@@ -50,7 +53,9 @@ data class NetworkIOInfo(
     val ipv4: String? = null,  // primary IPv4 address
     val nicName: String? = null,  // primary network interface name
     val mac: String? = null,  // primary network interface MAC address
-    val adapters: List<String> = emptyList()  // all installed (physical) network adapter names
+    val adapters: List<String> = emptyList(),  // all installed (physical) network adapter names
+    val connectionType: NetworkConnectionType = NetworkConnectionType.OTHER,  // active connection type
+    val operatorName: String? = null  // cellular network operator (provider) name, if cellular
 )
 
 data class SystemInfoSnapshot(
