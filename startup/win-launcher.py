@@ -155,7 +155,7 @@ def show_task_dialog(title, content, hyperlink_callback=None, main_instruction=N
         return None
 
 # Java 下载地址（TUNA 镜像）
-JAVA_INSTALL_URL = "https://mirrors.tuna.tsinghua.edu.cn/Adoptium/21/jre/x64/windows/OpenJDK21U-jre_x64_windows_hotspot_21.0.12_8.msi"
+JAVA_INSTALL_URL = "https://mirrors.tuna.tsinghua.edu.cn/Adoptium/21/jre/x64/windows/OpenJDK21U-jre_x64_windows_hotspot_21.0.12.1_1.msi"
 
 def _open_download_link(url):
     """打开下载链接"""
