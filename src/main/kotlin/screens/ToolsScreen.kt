@@ -38,6 +38,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
@@ -48,7 +49,12 @@ import utils.PackageManagerType
 import utils.CommonPackages
 import utils.PackageInfo
 import utils.PackageListLoader
+import utils.PackageDetector
+import utils.DetectionStatus
+import utils.UpdateChecker
+import utils.UpdateCheckStatus
 import utils.TerminalSessionManager
+import theme.warningColors
 import config.loadOfflineItems
 import config.addOfflineItem
 import config.updateOfflineItem
@@ -67,6 +73,7 @@ private data class GlobalResult(
     val offlineItem: OfflineItem? = null
 )
 
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ToolsScreen(
@@ -77,10 +84,11 @@ fun ToolsScreen(
     searchVisible: Boolean = false,
     searchQuery: String = "",
     onSearchQueryChange: (String) -> Unit = {},
+    sourceTab: Int = 0,
+    onSourceTabChange: (Int) -> Unit = {},
     onNavigateToTerminal: () -> Unit = {}
 ) {
     var selectedTab by rememberSaveable { mutableStateOf(0) }
-    var sourceTab by rememberSaveable { mutableStateOf(0) }
     var toolFilter by rememberSaveable { mutableStateOf(ToolFilter.ALL) }
     var filterMenuExpanded by remember { mutableStateOf(false) }
     var remotePackages by remember { mutableStateOf<List<PackageInfo>>(emptyList()) }
@@ -118,6 +126,57 @@ fun ToolsScreen(
                 CommonPackages.loadPackagesForManager(selectedPackageManager, true)
             else CommonPackages.loadPackagesForCurrentPlatform(true)
             else -> emptyList()
+        }
+    }
+
+    // 实际生效的包管理器（未显式选择时自动检测；该调用带进程级缓存）
+    val effectiveManager = remember(selectedPackageManager) {
+        if (selectedPackageManager != PackageManagerType.UNKNOWN) selectedPackageManager
+        else PackageManagerUtils.detectPackageManager()
+    }
+
+    // 已安装检测：仅在本进程确实需要时执行（首次进入 / 切换包管理器 / 缓存被删除）。
+    // 反复进出工具页会命中进程内快照，既不读盘也不扫描。
+    LaunchedEffect(effectiveManager) {
+        PackageDetector.detectIfNeeded(effectiveManager)
+        // 检测完成后再检查可用更新（顺序执行，避免两段网络请求叠加）
+        UpdateChecker.checkIfNeeded(effectiveManager)
+    }
+
+    // 检测中：显示转圈并隐藏卡片
+    val detection by PackageDetector.state.collectAsState()
+    val isDetecting = detection.status == DetectionStatus.SCANNING
+
+    // 更新检查中：先转圈（带「立即显示列表」），用户可选择提前展示卡片
+    val checkState by UpdateChecker.state.collectAsState()
+    val checkingUpdates = checkState.status == UpdateCheckStatus.CHECKING
+    var warningSnackbarVisible by remember { mutableStateOf(false) }
+
+    // 检测失败（如离线导致 RPM/Winget 命令不可用）时提示用户
+    val detectionMessage by PackageDetector.message.collectAsState()
+    LaunchedEffect(detectionMessage) {
+        detectionMessage?.let { snackbarHostState.showSnackbar(it) }
+    }
+
+    // 更新检查的警告提示（黄色）：不支持检查 / 检查失败
+    LaunchedEffect(checkState.supported, checkState.failed, checkState.noticeReported, effectiveManager) {
+        if (checkState.noticeReported) return@LaunchedEffect
+        val noticeMessage = when {
+            !checkState.supported -> "您设备上的包管理器不支持更新检查，请自行判断"
+            checkState.failed -> "更新检查失败，您需要自行判断"
+            else -> null
+        } ?: return@LaunchedEffect
+
+        UpdateChecker.markNoticeReported()
+        warningSnackbarVisible = true
+        val result = snackbarHostState.showSnackbar(
+            message = noticeMessage,
+            actionLabel = if (checkState.failed) "重试" else null,
+            duration = SnackbarDuration.Long
+        )
+        warningSnackbarVisible = false
+        if (result == SnackbarResult.ActionPerformed) {
+            UpdateChecker.retryCheck(effectiveManager)
         }
     }
 
@@ -208,31 +267,36 @@ fun ToolsScreen(
             // 搜索框展开但无输入：居中提示"键入来搜索"，不展示卡片
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 SearchPromptHint()
+                SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter)) { data ->
+                    WarningAwareSnackbar(data, warningSnackbarVisible)
+                }
             }
         } else if (isSearching && hasQuery) {
             // 全局搜索模式：隐藏 Tabs，显示所有匹配项
-            if (globalResults.isEmpty()) {
-                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                    EmptySearchHint()
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                when {
+                    isDetecting -> DetectingHint()
+                    checkingUpdates && !checkState.dismissed -> CheckingUpdatesHint(onShowNow = { UpdateChecker.dismiss() })
+                    globalResults.isEmpty() -> EmptySearchHint()
+                    else -> GlobalResultGrid(
+                        results = globalResults,
+                        selectedPackageManager = effectiveManager,
+                        onRunOffline = { item ->
+                            isExecuting = true
+                            if (item.type == MOfflineEntryType.PATH) {
+                                val workingDir = java.io.File(item.value).parent ?: ""
+                                TerminalSessionManager.executeCommandAndWait("\"${item.value}\"", workingDir)
+                            } else {
+                                TerminalSessionManager.executeCommandAndWait(item.value)
+                                onNavigateToTerminal()
+                            }
+                        },
+                        onDeleteOffline = { item -> deleteOfflineItem(item.id); offlineItems = loadOfflineItems() },
+                        onEditOffline = { item -> if (item.type == MOfflineEntryType.COMMAND) editCommandId = item.id }
+                    )
                 }
-            } else {
-                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                GlobalResultGrid(
-                results = globalResults,
-                selectedPackageManager = selectedPackageManager,
-                onRunOffline = { item ->
-                    isExecuting = true
-                    if (item.type == MOfflineEntryType.PATH) {
-                        val workingDir = java.io.File(item.value).parent ?: ""
-                        TerminalSessionManager.executeCommandAndWait("\"${item.value}\"", workingDir)
-                    } else {
-                        TerminalSessionManager.executeCommandAndWait(item.value)
-                        onNavigateToTerminal()
-                    }
-                },
-                onDeleteOffline = { item -> deleteOfflineItem(item.id); offlineItems = loadOfflineItems() },
-                onEditOffline = { item -> if (item.type == MOfflineEntryType.COMMAND) editCommandId = item.id }
-            )
+                SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter)) { data ->
+                    WarningAwareSnackbar(data, warningSnackbarVisible)
                 }
             }
         } else {
@@ -240,13 +304,13 @@ fun ToolsScreen(
             PrimaryTabRow(selectedTabIndex = sourceTab, modifier = Modifier.fillMaxWidth()) {
                 Tab(
                     selected = sourceTab == 0,
-                    onClick = { sourceTab = 0 },
+                    onClick = { onSourceTabChange(0) },
                     icon = { Icon(MaterialSymbols.Link, "联机", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary) },
                     text = { Text("联机", fontSize = 14.sp) }
                 )
                 Tab(
                     selected = sourceTab == 1,
-                    onClick = { sourceTab = 1 },
+                    onClick = { onSourceTabChange(1) },
                     icon = { Icon(MaterialSymbols.LinkOff, "本地", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary) },
                     text = { Text("本地", fontSize = 14.sp) }
                 )
@@ -264,12 +328,17 @@ fun ToolsScreen(
                 Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp)) {
                     when {
                         isLoading -> LoadingHint()
+                        isDetecting -> DetectingHint()
+                        checkingUpdates && !checkState.dismissed -> CheckingUpdatesHint(onShowNow = { UpdateChecker.dismiss() })
                         filteredPackages.isEmpty() -> EmptyPackageListHint(errorMessage, onRetry = { reloadTrigger++ })
                         categories.isNotEmpty() && selectedTab < categories.size -> {
                             val tools = (packagesByCategory[categories[selectedTab]] ?: emptyList())
                                 .filter { t -> searchQuery.isBlank() || t.name.contains(searchQuery.trim(), true) || t.description?.contains(searchQuery.trim(), true) == true }
-                            if (tools.isEmpty()) EmptySearchHint() else ToolCardGrid(tools, selectedPackageManager)
+                            if (tools.isEmpty()) EmptySearchHint() else ToolCardGrid(tools, effectiveManager)
                         }
+                    }
+                    SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter)) { data ->
+                        WarningAwareSnackbar(data, warningSnackbarVisible)
                     }
                 }
             } else if (sourceTab == 1 && showOffline) {
@@ -332,7 +401,9 @@ fun ToolsScreen(
                             }
                         }
                     }
-                    SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
+                    SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter)) { data ->
+                        WarningAwareSnackbar(data, warningSnackbarVisible)
+                    }
                 }
             }
         }
@@ -509,6 +580,48 @@ private fun LoadingHint() {
     }
 }
 
+/** 检测已安装包期间占位：显示转圈并隐藏卡片 */
+@Composable
+private fun DetectingHint() {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            CircularProgressIndicator(modifier = Modifier.size(48.dp), strokeWidth = 4.dp)
+            Text("正在检测已安装的应用", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/** 检查可用更新期间占位：显示转圈，并提供「立即显示列表」提前查看卡片 */
+@Composable
+private fun CheckingUpdatesHint(onShowNow: () -> Unit) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            CircularProgressIndicator(modifier = Modifier.size(48.dp), strokeWidth = 4.dp)
+            Text("正在检查可用更新", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedButton(onClick = onShowNow) {
+                Text("立即显示列表")
+            }
+        }
+    }
+}
+
+/** 警告类提示使用主题里的黄色警告色，其余 Snackbar 保持默认外观 */
+@Composable
+private fun WarningAwareSnackbar(data: SnackbarData, warning: Boolean) {
+    if (warning) {
+        val colors = MaterialTheme.warningColors
+        Snackbar(
+            snackbarData = data,
+            containerColor = colors.container,
+            contentColor = colors.onContainer,
+            actionColor = colors.action,
+            actionContentColor = colors.action
+        )
+    } else {
+        Snackbar(snackbarData = data)
+    }
+}
+
 @Composable
 private fun SearchPromptHint() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -570,17 +683,71 @@ fun ToolCard(
     selectedPackageManager: PackageManagerType = PackageManagerType.UNKNOWN,
     modifier: Modifier = Modifier
 ) {
-    val packageManager = remember(selectedPackageManager) { if (selectedPackageManager != PackageManagerType.UNKNOWN) selectedPackageManager else PackageManagerUtils.detectPackageManager() }
+    // 包管理器由 ToolsScreen 统一解析（内部带进程级缓存），此处不再重复检测
+    val packageManager = selectedPackageManager
     val packageName = remember(tool, packageManager) { tool.getPackageNameForManager(packageManager) }
     val licenseOrEulaUrl = remember(tool) { if (tool.isProprietarySoftware) tool.eulaUrl else tool.licenseUrl ?: getDefaultLicenseUrl(tool.url) }
+    val supported = packageName != null && packageManager != PackageManagerType.UNKNOWN
     val installCommand = remember(packageName, packageManager) {
-        if (packageName != null && packageManager != PackageManagerType.UNKNOWN) PackageManagerUtils.getInstallCommand(packageManager, packageName) else null
+        if (supported) PackageManagerUtils.getInstallCommand(packageManager, packageName) else null
     }
-    var installDialogState by remember { mutableStateOf<InstallDialogState?>(null) }
+    val updateCommand = remember(packageName, packageManager) {
+        if (supported) PackageManagerUtils.getPackageUpdateCommand(packageManager, packageName) else null
+    }
+    val uninstallCommand = remember(packageName, packageManager) {
+        if (supported) PackageManagerUtils.getUninstallCommand(packageManager, packageName) else null
+    }
+    // 待确认的包管理动作（安装 / 更新 / 卸载）
+    var pendingAction by remember { mutableStateOf<PackageAction?>(null) }
+    val scope = rememberCoroutineScope()
 
-    Card(modifier = modifier.height(240.dp), elevation = CardDefaults.cardElevation(4.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+    // 已安装检测（响应式）：快照查表为 O(1)
+    val detection by PackageDetector.state.collectAsState()
+    val installedEntry = detection.takeIf { it.manager == packageManager }?.snapshot?.lookup(packageName)
+    val isInstalled = installedEntry != null
+
+    // 更新可用性（响应式）：
+    // - 仅在「检查成功且确认无更新」或「正在检查」时禁用
+    // - 不支持检查（EMERGE）或检查失败时保持可用，由用户自行判断
+    val checkState by UpdateChecker.state.collectAsState()
+    val sameManager = checkState.manager == packageManager
+    val checkingUpdates = sameManager && checkState.status == UpdateCheckStatus.CHECKING
+    val upToDate = isInstalled && sameManager && checkState.supported && !checkState.failed &&
+            checkState.status == UpdateCheckStatus.READY &&
+            !UpdateChecker.hasUpdate(packageManager, packageName)
+    val canUpdate = updateCommand != null && !checkingUpdates && !upToDate
+
+    // 可升级到的目标版本（无可用更新时为 null）
+    val targetVersion = if (isInstalled) UpdateChecker.availableVersion(packageName) else null
+
+    val pendingCommand = when (pendingAction) {
+        PackageAction.INSTALL -> installCommand
+        PackageAction.UPDATE -> updateCommand
+        PackageAction.UNINSTALL -> uninstallCommand
+        null -> null
+    }
+
+    Card(modifier = modifier.height(260.dp), elevation = CardDefaults.cardElevation(4.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
         Column(modifier = Modifier.fillMaxSize().padding(12.dp), horizontalAlignment = Alignment.Start, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(tool.name, style = MaterialTheme.typography.titleMedium)
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = tool.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                // 已安装：右上角提供卸载入口
+                if (isInstalled) {
+                    IconButton(
+                        onClick = { pendingAction = PackageAction.UNINSTALL },
+                        enabled = uninstallCommand != null,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(MaterialSymbols.Delete, "卸载", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
             Text(tool.description ?: "", style = MaterialTheme.typography.bodySmall, maxLines = 2)
             if (tool.isProprietarySoftware) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
@@ -601,10 +768,54 @@ fun ToolCard(
                     Text(if (isWindows) "包名: $packageName" else "Linux包名: $packageName", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                 }
             }
+            if (isInstalled) {
+                val versionLabel = installedEntry.version?.let { "已安装 · $it" } ?: "已安装"
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+                    Icon(MaterialSymbols.Check, "已安装", Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+                    Text(
+                        text = versionLabel,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            if (isInstalled && targetVersion != null) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+                    Icon(MaterialSymbols.Info, "有更新", Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+                    Text(
+                        text = "有更新 · $targetVersion",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
             Spacer(modifier = Modifier.weight(1f))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { installDialogState = InstallDialogState.CONFIRM }, modifier = Modifier.weight(1f), enabled = installCommand != null) {
-                    Icon(MaterialSymbols.Download, "安装", Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("安装", fontSize = 12.sp)
+                if (isInstalled) {
+                    Button(
+                        onClick = { pendingAction = PackageAction.UPDATE },
+                        modifier = Modifier.weight(1f),
+                        enabled = canUpdate
+                    ) {
+                        // 确认无可用更新时，按钮改为「已是最新」并换用勾选图标
+                        if (upToDate) {
+                            Icon(MaterialSymbols.Check, "已是最新", Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("已是最新", fontSize = 12.sp)
+                        } else {
+                            Icon(MaterialSymbols.Refresh, "更新", Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("更新", fontSize = 12.sp)
+                        }
+                    }
+                } else {
+                    Button(
+                        onClick = { pendingAction = PackageAction.INSTALL },
+                        modifier = Modifier.weight(1f),
+                        enabled = installCommand != null
+                    ) {
+                        Icon(MaterialSymbols.Download, "安装", Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("安装", fontSize = 12.sp)
+                    }
                 }
                 if (licenseOrEulaUrl != null) {
                     OutlinedButton(onClick = { openToolWebsite(licenseOrEulaUrl) }, modifier = Modifier.weight(1f)) {
@@ -614,8 +825,29 @@ fun ToolCard(
             }
         }
     }
-    if (installDialogState == InstallDialogState.CONFIRM) {
-        InstallConfirmationDialog(tool.name, installCommand ?: "", { installDialogState = null }, { TerminalSessionManager.executeCommandAndWait(installCommand ?: "") })
+    val action = pendingAction
+    if (action != null && pendingCommand != null) {
+        PackageActionDialog(
+            toolName = tool.name,
+            action = action,
+            command = pendingCommand,
+            onDismiss = { pendingAction = null },
+            onConfirm = { TerminalSessionManager.executeCommandAndWait(pendingCommand) },
+            onSucceeded = {
+                when (action) {
+                    PackageAction.INSTALL ->
+                        scope.launch { PackageDetector.onPackageInstalled(packageManager, packageName) }
+                    PackageAction.UNINSTALL ->
+                        scope.launch { PackageDetector.onPackageUninstalled(packageManager, packageName) }
+                    PackageAction.UPDATE -> scope.launch {
+                        // 更新后版本号已过时：静默重扫（不转圈、卡片不消失）
+                        PackageDetector.rescanSilently(packageManager)
+                        // 同步刷新可用更新信息，使「更新」按钮回到正确状态
+                        UpdateChecker.recheckSilently(packageManager)
+                    }
+                }
+            }
+        )
     }
 }
 
@@ -651,25 +883,82 @@ private fun parseAnsiForDialog(text: String): AnnotatedString {
     }
 }
 
-private enum class InstallDialogState { CONFIRM, PROGRESS, RESULT }
+/** 包管理动作：安装 / 更新 / 卸载 */
+enum class PackageAction { INSTALL, UPDATE, UNINSTALL }
+
+private enum class PackageDialogState { CONFIRM, PROGRESS, RESULT }
 
 @Composable
-fun InstallConfirmationDialog(toolName: String, installCommand: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
-    var dialogState by remember { mutableStateOf(InstallDialogState.CONFIRM) }
+fun PackageActionDialog(
+    toolName: String,
+    action: PackageAction,
+    command: String,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+    onSucceeded: () -> Unit = {}
+) {
+    var dialogState by remember { mutableStateOf(PackageDialogState.CONFIRM) }
     var installSuccess by remember { mutableStateOf(false) }
+
+    // 各动作的文案
+    val confirmTitle = when (action) {
+        PackageAction.INSTALL -> "确认安装"
+        PackageAction.UPDATE -> "确认更新"
+        PackageAction.UNINSTALL -> "确认卸载"
+    }
+    val confirmLead = when (action) {
+        PackageAction.INSTALL -> "将执行以下命令安装 $toolName:"
+        PackageAction.UPDATE -> "将执行以下命令更新 $toolName:"
+        PackageAction.UNINSTALL -> "将执行以下命令卸载 $toolName:"
+    }
+    val confirmWarning = when (action) {
+        PackageAction.INSTALL -> "注意：这需要管理员权限，可能会要求输入密码。"
+        PackageAction.UPDATE -> "注意：这需要管理员权限，可能会要求输入密码。"
+        PackageAction.UNINSTALL -> "注意：卸载后可能需要重新安装才能恢复；该操作需要管理员权限。"
+    }
+    val progressTitle = when (action) {
+        PackageAction.INSTALL -> "正在安装"
+        PackageAction.UPDATE -> "正在更新"
+        PackageAction.UNINSTALL -> "正在卸载"
+    }
+    val resultTitle = when (action) {
+        PackageAction.INSTALL -> if (installSuccess) "安装成功！" else "安装失败"
+        PackageAction.UPDATE -> if (installSuccess) "更新成功！" else "更新失败"
+        PackageAction.UNINSTALL -> if (installSuccess) "卸载成功！" else "卸载失败"
+    }
+    val resultText = when (action) {
+        PackageAction.INSTALL -> if (installSuccess) "已成功安装 $toolName" else "无法安装 $toolName，详情请查看\"终端\"页面输出"
+        PackageAction.UPDATE -> if (installSuccess) "已成功更新 $toolName" else "无法更新 $toolName，详情请查看\"终端\"页面输出"
+        PackageAction.UNINSTALL -> if (installSuccess) "已成功卸载 $toolName" else "无法卸载 $toolName，详情请查看\"终端\"页面输出"
+    }
+
     when (dialogState) {
-        InstallDialogState.CONFIRM -> AlertDialog(onDismissRequest = onDismiss, title = { Text("确认安装") },
-            text = { Column { Text("将执行以下命令安装 $toolName:"); Spacer(Modifier.height(8.dp)); Text(installCommand, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(4.dp)).padding(8.dp)); Spacer(Modifier.height(8.dp)); Text("注意：这需要管理员权限，可能会要求输入密码。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) } },
-            confirmButton = { Button(onClick = { onConfirm(); dialogState = InstallDialogState.PROGRESS }) { Text("确认安装") } },
+        PackageDialogState.CONFIRM -> AlertDialog(onDismissRequest = onDismiss, title = { Text(confirmTitle) },
+            text = { Column { Text(confirmLead); Spacer(Modifier.height(8.dp)); Text(command, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(4.dp)).padding(8.dp)); Spacer(Modifier.height(8.dp)); Text(confirmWarning, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) } },
+            confirmButton = { Button(onClick = { onConfirm(); dialogState = PackageDialogState.PROGRESS }) { Text(confirmTitle) } },
             dismissButton = { OutlinedButton(onClick = onDismiss) { Text("取消") } })
-        InstallDialogState.PROGRESS -> {
+        PackageDialogState.PROGRESS -> {
             var output by remember { mutableStateOf("") }
             var running by remember { mutableStateOf(false) }
             LaunchedEffect(Unit) { TerminalSessionManager.outputFlow.collect { output = it } }
-            LaunchedEffect(Unit) { TerminalSessionManager.isRunning.collect { r -> running = r; if (!r) { installSuccess = TerminalSessionManager.lastExitCode.value == 0; dialogState = InstallDialogState.RESULT } } }
+            LaunchedEffect(Unit) {
+                var sawRunning = false
+                var resultHandled = false
+                TerminalSessionManager.isRunning.collect { r ->
+                    running = r
+                    if (r) {
+                        sawRunning = true
+                    } else if (sawRunning && !resultHandled) {
+                        resultHandled = true
+                        installSuccess = TerminalSessionManager.lastExitCode.value == 0
+                        if (installSuccess) onSucceeded()
+                        dialogState = PackageDialogState.RESULT
+                    }
+                }
+            }
             // 嵌入式终端样式的输出区域（深色背景 + ANSI 着色 + 等宽字体）
             val annotatedOutput = remember(output) { parseAnsiForDialog(output) }
-            AlertDialog(onDismissRequest = {}, title = { Text("正在安装") },
+            AlertDialog(onDismissRequest = {}, title = { Text(progressTitle) },
                 text = {
                     Column {
                         // 内嵌终端的输入状态（PROGRESS 期间持有）
@@ -783,8 +1072,8 @@ fun InstallConfirmationDialog(toolName: String, installCommand: String, onDismis
                 },
                 confirmButton = { if (running) OutlinedButton(onClick = { TerminalSessionManager.stopCurrentProcess() }) { Text("取消") } })
         }
-        InstallDialogState.RESULT -> AlertDialog(onDismissRequest = onDismiss, title = { Text(if (installSuccess) "安装成功！" else "安装失败", style = MaterialTheme.typography.titleLarge) },
-            text = { Text(if (installSuccess) "已成功安装 $toolName" else "无法安装 $toolName，详情请查看\"终端\"页面输出", textAlign = TextAlign.Center) },
+        PackageDialogState.RESULT -> AlertDialog(onDismissRequest = onDismiss, title = { Text(resultTitle, style = MaterialTheme.typography.titleLarge) },
+            text = { Text(resultText, textAlign = TextAlign.Center) },
             confirmButton = { Button(onClick = onDismiss) { Text("完成") } })
     }
 }

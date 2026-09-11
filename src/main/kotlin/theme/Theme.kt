@@ -8,6 +8,7 @@
 package theme
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.MaterialTheme
 
@@ -21,7 +22,9 @@ fun AppTheme(darkTheme: Boolean, seedHex: String?, content: @Composable () -> Un
     val base = seedColor ?: Color(0xFF6750A4) // fallback seed
     val scheme = generateColorScheme(base, darkTheme)
 
-    MaterialTheme(colorScheme = scheme) {
-        content()
+    CompositionLocalProvider(LocalWarningColors provides warningColorsFor(darkTheme)) {
+        MaterialTheme(colorScheme = scheme) {
+            content()
+        }
     }
 }

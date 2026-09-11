@@ -10,11 +10,16 @@ package main.kotlin
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.window.singleWindowApplication
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import components.MaterialSymbols
 import components.AppScaffold
@@ -30,6 +35,7 @@ import config.saveConfig
 import config.AppConfig
 import config.WallpaperState
 import config.ToolCommandSessionMode
+import config.GreetingMode
 import ntb.generated.resources.Res
 import ntb.generated.resources.logo
 import org.jetbrains.compose.resources.painterResource
@@ -42,8 +48,12 @@ import java.awt.Dimension
 import java.time.LocalTime
 import utils.PackageManagerType
 import utils.PackageManagerUtils
+import utils.PackageDetector
+import utils.UpdateChecker
+import utils.UpdateCheckStatus
 import utils.TerminalSessionManager
 import utils.CardBgManager
+import kotlinx.coroutines.launch
 
 // 编译时常量：true=启用本地DEBUG包列表，false=从远程拉取
 const val IS_DEBUG = false
@@ -65,6 +75,23 @@ private fun greetingForOverview(customName: String?): String {
         ?: System.getProperty("user.name")?.trim().takeIf { !it.isNullOrBlank() }
         ?: "用户"
     return "$greeting，$name"
+}
+
+/**
+ * 根据问候模式解析首页标题：
+ * - DEFAULT：由 [greetingForOverview] 按时间生成问候 + 称谓；
+ * - CUSTOM：原样显示用户自定义的整条问候语；若为空则回退默认，避免标题空白。
+ */
+private fun resolveGreeting(
+    mode: GreetingMode,
+    displayName: String?,
+    customGreeting: String?
+): String {
+    if (mode == GreetingMode.CUSTOM) {
+        val text = customGreeting?.trim()
+        if (!text.isNullOrBlank()) return text
+    }
+    return greetingForOverview(displayName)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -89,6 +116,8 @@ fun main() = application {
         // 工具页搜索状态：Search 按钮在 TopBar，搜索框在工具页内容区
         var toolSearchVisible by remember { mutableStateOf(false) }
         var toolSearchQueryState by remember { mutableStateOf("") }
+        // 工具页的一级标签（0=联机 / 1=本地），提升到此处以便 TopBar 根据它隐藏按钮
+        var toolSourceTab by remember { mutableStateOf(0) }
 
         // load persisted settings
         val loaded = loadConfig()
@@ -102,6 +131,10 @@ fun main() = application {
         var terminalEncoding by remember { mutableStateOf(loaded.terminalEncoding) }
         // 自定义称谓（主页 TopBar 对用户的称呼）
         var displayName by remember { mutableStateOf(loaded.displayName ?: "") }
+        // 问候语模式（默认=DEFAULT；完全自定义=CUSTOM）
+        var greetingMode by remember { mutableStateOf(loaded.greetingMode.ifBlank { "DEFAULT" }) }
+        // 自定义整条问候语文本（greetingMode=CUSTOM 时使用）
+        var customGreeting by remember { mutableStateOf(loaded.customGreeting ?: "") }
         // 壁纸设置
         var useCustomBg by remember { mutableStateOf(loaded.useCustomBg) }
         var customBgFile by remember { mutableStateOf(loaded.customBgFile) }
@@ -109,6 +142,9 @@ fun main() = application {
         var toolCommandSessionMode by remember { mutableStateOf(loaded.toolCommandSession) }
         // 终端进程结束后是否立即结束会话
         var closeSessionOnEnd by remember { mutableStateOf(loaded.closeSessionOnEnd) }
+
+        // 用于触发「重新检测已安装」等挂起操作
+        val appScope = rememberCoroutineScope()
 
         // 初始化 TerminalSessionManager 的编码
         TerminalSessionManager.setEncoding(terminalEncoding)
@@ -129,20 +165,62 @@ fun main() = application {
         WallpaperState.useCustomBg = useCustomBg
         WallpaperState.customBgFileName = customBgFile
 
+        // 将所有设置持久化。集中为一处，避免各事件处理器里手写 AppConfig 遗漏字段
+        // （例如漏掉 greetingMode/customGreeting 会在改其它设置时把问候语重置为默认）。
+        fun persist() {
+            saveConfig(
+                AppConfig(
+                    dark = isDark,
+                    color = seedHex,
+                    useProxy = useProxy,
+                    proxyUrl = proxyUrl,
+                    terminalEncoding = terminalEncoding,
+                    displayName = displayName,
+                    greetingMode = greetingMode,
+                    customGreeting = customGreeting,
+                    useCustomBg = useCustomBg,
+                    customBgFile = customBgFile,
+                    toolCommandSession = toolCommandSessionMode,
+                    closeSessionOnEnd = closeSessionOnEnd
+                )
+            )
+        }
+
         val topBarTitle = when (selectedNavIndex) {
             1 -> "工具"
             2 -> "终端"
             3 -> "设置"
             4 -> "关于"
-            else -> greetingForOverview(displayName)
+            else -> resolveGreeting(GreetingMode.fromName(greetingMode), displayName, customGreeting)
         }
 
         AppTheme(darkTheme = isDark, seedHex = seedHex) {
             AppScaffold(
                 startBar = { NavRail(selectedIndex = selectedNavIndex, onSelection = { selectedNavIndex = it }) },
                 topBarTitle = topBarTitle,
+                topBarProgress = {
+                    // 用户点了「立即显示列表」后，用非确定性线性指示器继续提示后台仍在检查
+                    val updateState by UpdateChecker.state.collectAsState()
+                    if (updateState.status == UpdateCheckStatus.CHECKING && updateState.dismissed) {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    }
+                },
                 topBarActions = {
                     if (selectedNavIndex == 1) {
+                        // 工具页：重新检测已安装的包，并重新检查可用更新
+                        // 切到「本地」（离线）标签页时隐藏该按钮
+                        if (toolSourceTab == 0) {
+                            IconButton(onClick = {
+                                appScope.launch {
+                                    val manager = if (selectedPackageManager != PackageManagerType.UNKNOWN)
+                                        selectedPackageManager else PackageManagerUtils.detectPackageManager(force = true)
+                                    PackageDetector.rescan(manager)
+                                    UpdateChecker.retryCheck(manager)
+                                }
+                            }) {
+                                Icon(MaterialSymbols.Refresh, "重新检测已安装")
+                            }
+                        }
                         IconButton(onClick = {
                             toolSearchVisible = !toolSearchVisible
                             if (!toolSearchVisible) toolSearchQueryState = ""
@@ -181,6 +259,8 @@ fun main() = application {
                         searchVisible = toolSearchVisible,
                         searchQuery = toolSearchQueryState,
                         onSearchQueryChange = { toolSearchQueryState = it },
+                        sourceTab = toolSourceTab,
+                        onSourceTabChange = { toolSourceTab = it },
                         onNavigateToTerminal = { selectedNavIndex = 2 }
                     )
                     2 -> TerminalScreen()
@@ -188,41 +268,51 @@ fun main() = application {
                         isDarkTheme = isDark,
                         onThemeChange = { newDark ->
                             isDark = newDark
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, toolCommandSession = toolCommandSessionMode, closeSessionOnEnd = closeSessionOnEnd))
+                            persist()
                         },
                         selectedColor = seedHex ?: "",
                         onColorChange = { hex ->
                             seedHex = if (hex.isBlank()) null else hex
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, toolCommandSession = toolCommandSessionMode, closeSessionOnEnd = closeSessionOnEnd))
+                            persist()
                         },
                         selectedPackageManager = selectedPackageManager,
                         onPackageManagerChange = { selectedPackageManager = it },
                         useProxy = useProxy,
                         onUseProxyChange = { newUseProxy ->
                             useProxy = newUseProxy
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, toolCommandSession = toolCommandSessionMode, closeSessionOnEnd = closeSessionOnEnd))
+                            persist()
                         },
                         proxyUrl = proxyUrl,
                         onProxyUrlChange = { newProxyUrl ->
                             proxyUrl = newProxyUrl
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, toolCommandSession = toolCommandSessionMode, closeSessionOnEnd = closeSessionOnEnd))
+                            persist()
                         },
                         terminalEncoding = terminalEncoding,
                         onTerminalEncodingChange = { newEncoding ->
                             terminalEncoding = newEncoding
                             TerminalSessionManager.setEncoding(newEncoding)
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = newEncoding, toolCommandSession = toolCommandSessionMode, closeSessionOnEnd = closeSessionOnEnd))
+                            persist()
                         },
                         displayName = displayName,
                         onDisplayNameChange = { newName ->
                             displayName = newName
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = newName, toolCommandSession = toolCommandSessionMode, closeSessionOnEnd = closeSessionOnEnd))
+                            persist()
+                        },
+                        greetingMode = greetingMode,
+                        onGreetingModeChange = { newMode ->
+                            greetingMode = newMode
+                            persist()
+                        },
+                        customGreeting = customGreeting,
+                        onCustomGreetingChange = { newText ->
+                            customGreeting = newText
+                            persist()
                         },
                         useCustomBg = useCustomBg,
                         onUseCustomBgChange = { newVal ->
                             useCustomBg = newVal
                             WallpaperState.useCustomBg = newVal
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, useCustomBg = newVal, customBgFile = customBgFile, toolCommandSession = toolCommandSessionMode, closeSessionOnEnd = closeSessionOnEnd))
+                            persist()
                         },
                         customBgFile = customBgFile,
                         onCustomBgFileChange = { newFile ->
@@ -233,19 +323,19 @@ fun main() = application {
                             }
                             customBgFile = newFile
                             WallpaperState.customBgFileName = newFile
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, useCustomBg = useCustomBg, customBgFile = newFile, toolCommandSession = toolCommandSessionMode, closeSessionOnEnd = closeSessionOnEnd))
+                            persist()
                         },
                         toolCommandSessionMode = toolCommandSessionMode,
                         onToolCommandSessionModeChange = { newMode ->
                             toolCommandSessionMode = newMode
                             TerminalSessionManager.setToolCommandSessionMode(ToolCommandSessionMode.fromName(newMode))
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, useCustomBg = useCustomBg, customBgFile = customBgFile, toolCommandSession = newMode, closeSessionOnEnd = closeSessionOnEnd))
+                            persist()
                         },
                         closeSessionOnEnd = closeSessionOnEnd,
                         onCloseSessionOnEndChange = { newVal ->
                             closeSessionOnEnd = newVal
                             TerminalSessionManager.setCloseSessionOnEnd(newVal)
-                            saveConfig(AppConfig(dark = isDark, color = seedHex, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, useCustomBg = useCustomBg, customBgFile = customBgFile, toolCommandSession = toolCommandSessionMode, closeSessionOnEnd = newVal))
+                            persist()
                         }
                     )
                     4 -> AboutScreen()

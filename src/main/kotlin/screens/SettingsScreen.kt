@@ -28,6 +28,7 @@ import utils.PackageManagerType
 import utils.CardBgManager
 import config.TerminalEncoding
 import config.ToolCommandSessionMode
+import config.GreetingMode
 import java.awt.FileDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -48,6 +49,10 @@ fun SettingsScreen(
     onTerminalEncodingChange: (String) -> Unit = {},
     displayName: String = "",
     onDisplayNameChange: (String) -> Unit = {},
+    greetingMode: String = "DEFAULT",
+    onGreetingModeChange: (String) -> Unit = {},
+    customGreeting: String = "",
+    onCustomGreetingChange: (String) -> Unit = {},
     useCustomBg: Boolean = false,
     onUseCustomBgChange: (Boolean) -> Unit = {},
     customBgFile: String? = null,
@@ -61,6 +66,8 @@ fun SettingsScreen(
     var hexInput by remember { mutableStateOf(selectedColor) }
     var saveStateMessage by remember { mutableStateOf<String?>(null) }
     var displayNameInput by remember(displayName) { mutableStateOf(displayName) }
+    var greetingModeInput by remember(greetingMode) { mutableStateOf(greetingMode) }
+    var customGreetingInput by remember(customGreeting) { mutableStateOf(customGreeting) }
 
     // 检测当前平台和包管理器
     val osName = remember { System.getProperty("os.name").lowercase() }
@@ -123,51 +130,6 @@ fun SettingsScreen(
                     uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
                 )
-            )
-        }
-
-        HorizontalDivider(
-            modifier = Modifier.padding(vertical = 8.dp),
-            thickness = DividerDefaults.Thickness,
-            color = DividerDefaults.color
-        )
-
-        // 设置项：称谓
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(
-                    imageVector = MaterialSymbols.AccountCircle,
-                    contentDescription = "称谓",
-                    modifier = Modifier.size(20.dp)
-                )
-                Column {
-                    Text(
-                        text = "称谓",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Text(
-                        text = "如何称呼您",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            TextField(
-                value = displayNameInput,
-                onValueChange = { displayNameInput = it; onDisplayNameChange(it) },
-                singleLine = true,
-                placeholder = { Text(System.getProperty("user.name") ?: "用户") },
-                modifier = Modifier.width(200.dp)
             )
         }
 
@@ -353,6 +315,129 @@ fun SettingsScreen(
                             Text("撤下")
                         }
                     }
+                }
+            }
+        }
+
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 8.dp),
+            thickness = DividerDefaults.Thickness,
+            color = DividerDefaults.color
+        )
+
+        // 设置项：称谓（问候语方式）
+        // 图标与“称谓”标题、右侧输入框的排版保持不变；
+        // “问候方式”选择器置于输入上方，右侧输入框内容随之切换：
+        // 默认=编辑称谓；自定义=编辑整条问候语（首页标题原样显示）。
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp)
+        ) {
+            Text(
+                text = "主页问候语",
+                style = MaterialTheme.typography.titleMedium,
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+
+            val isCustom = GreetingMode.fromName(greetingModeInput) == GreetingMode.CUSTOM
+
+            // 问候方式选择器（默认 / 自定义问候语）——置于输入上方
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clickable {
+                            greetingModeInput = GreetingMode.DEFAULT.name
+                            onGreetingModeChange(GreetingMode.DEFAULT.name)
+                        }
+                        .padding(vertical = 4.dp)
+                ) {
+                    RadioButton(
+                        selected = !isCustom,
+                        onClick = {
+                            greetingModeInput = GreetingMode.DEFAULT.name
+                            onGreetingModeChange(GreetingMode.DEFAULT.name)
+                        }
+                    )
+                    Text(
+                        text = "默认",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clickable {
+                            greetingModeInput = GreetingMode.CUSTOM.name
+                            onGreetingModeChange(GreetingMode.CUSTOM.name)
+                        }
+                        .padding(vertical = 4.dp)
+                ) {
+                    RadioButton(
+                        selected = isCustom,
+                        onClick = {
+                            greetingModeInput = GreetingMode.CUSTOM.name
+                            onGreetingModeChange(GreetingMode.CUSTOM.name)
+                        }
+                    )
+                    Text(
+                        text = "自定义问候语",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // 图标 + 标题 + 输入行
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = MaterialSymbols.AccountCircle,
+                        contentDescription = "称谓",
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Column {
+                        Text(
+                            text = if (isCustom) "自定义问候语" else "称谓",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = if (isCustom) "自定义整条问候语，首页标题将原样显示" else "如何称呼您",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                // 默认：编辑称谓；自定义：编辑整条问候语
+                if (isCustom) {
+                    TextField(
+                        value = customGreetingInput,
+                        onValueChange = { customGreetingInput = it; onCustomGreetingChange(it) },
+                        singleLine = true,
+                        placeholder = { Text("例如：欢迎回来") },
+                        modifier = Modifier.width(320.dp)
+                    )
+                } else {
+                    TextField(
+                        value = displayNameInput,
+                        onValueChange = { displayNameInput = it; onDisplayNameChange(it) },
+                        singleLine = true,
+                        placeholder = { Text(System.getProperty("user.name") ?: "用户") },
+                        modifier = Modifier.width(200.dp)
+                    )
                 }
             }
         }

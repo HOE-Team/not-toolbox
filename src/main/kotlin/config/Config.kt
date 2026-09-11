@@ -38,6 +38,20 @@ enum class ToolCommandSessionMode(val displayName: String) {
     }
 }
 
+/**
+ * 首页问候语模式
+ */
+enum class GreetingMode(val displayName: String) {
+    /** 默认：按时间段自动生成问候前缀 + 称谓（如"下午好，张三"） */
+    DEFAULT("默认"),
+    /** 完全自定义：首页标题原样显示用户输入的整条问候语 */
+    CUSTOM("自定义问候语");
+
+    companion object {
+        fun fromName(name: String): GreetingMode = entries.find { it.name == name } ?: DEFAULT
+    }
+}
+
 data class AppConfig(
     val dark: Boolean = false, 
     val color: String? = null, 
@@ -45,6 +59,10 @@ data class AppConfig(
     val proxyUrl: String = "https://gh-proxy.com",
     val terminalEncoding: String = "UTF-8",
     val displayName: String? = null,
+    // 首页问候语模式（DEFAULT=默认时间问候 / CUSTOM=完全自定义整条问候语）
+    val greetingMode: String = "DEFAULT",
+    // 自定义整条问候语文本（greetingMode=CUSTOM 且非空时，首页标题原样显示）
+    val customGreeting: String? = null,
     // 壁纸相关：不获取桌面壁纸（Linux 上此值不影响显示，始终视为开启）
     val useCustomBg: Boolean = false,
     // 用户自选的本地背景文件名（存放在程序目录 /cardbg/ 下）
@@ -67,6 +85,8 @@ fun loadConfig(): AppConfig {
         var proxyUrl: String = "https://gh-proxy.com"
         var terminalEncoding: String = "UTF-8"
         var displayName: String? = null
+        var greetingMode: String = "DEFAULT"
+        var customGreeting: String? = null
         var useCustomBg: Boolean = false
         var customBgFile: String? = null
         var toolCommandSession: String = "NEW"
@@ -112,6 +132,20 @@ fun loadConfig(): AppConfig {
                     if (v.startsWith("\"") && v.endsWith("\"")) v = v.substring(1, v.length - 1)
                     if (v.isNotBlank()) displayName = v
                 }
+            } else if (line.startsWith("greeting_mode")) {
+                val parts = line.split('=', limit = 2)
+                if (parts.size == 2) {
+                    var v = parts[1].trim()
+                    if (v.startsWith("\"") && v.endsWith("\"")) v = v.substring(1, v.length - 1)
+                    if (v.isNotBlank()) greetingMode = v
+                }
+            } else if (line.startsWith("custom_greeting")) {
+                val parts = line.split('=', limit = 2)
+                if (parts.size == 2) {
+                    var v = parts[1].trim()
+                    if (v.startsWith("\"") && v.endsWith("\"")) v = v.substring(1, v.length - 1)
+                    if (v.isNotBlank()) customGreeting = v
+                }
             } else if (line.startsWith("use_custom_bg")) {
                 val parts = line.split('=', limit = 2)
                 if (parts.size == 2) {
@@ -138,7 +172,7 @@ fun loadConfig(): AppConfig {
                 }
             }
         }
-        AppConfig(dark = dark, color = color, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, useCustomBg = useCustomBg, customBgFile = customBgFile, toolCommandSession = toolCommandSession, closeSessionOnEnd = closeSessionOnEnd)
+        AppConfig(dark = dark, color = color, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, greetingMode = greetingMode, customGreeting = customGreeting, useCustomBg = useCustomBg, customBgFile = customBgFile, toolCommandSession = toolCommandSession, closeSessionOnEnd = closeSessionOnEnd)
     } catch (e: Exception) {
         AppConfig()
     }
@@ -165,6 +199,16 @@ fun saveConfig(cfg: AppConfig) {
         sb.append("display_name = ")
         if (cfg.displayName != null && cfg.displayName.isNotBlank()) {
             sb.append('"').append(cfg.displayName).append('"')
+        } else {
+            sb.append("\"\"")
+        }
+        sb.append('\n')
+        sb.append("greeting_mode = \"")
+            .append(cfg.greetingMode.ifBlank { "DEFAULT" })
+            .append("\"\n")
+        sb.append("custom_greeting = ")
+        if (cfg.customGreeting != null && cfg.customGreeting.isNotBlank()) {
+            sb.append('"').append(cfg.customGreeting).append('"')
         } else {
             sb.append("\"\"")
         }

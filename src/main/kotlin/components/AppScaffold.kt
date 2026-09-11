@@ -34,6 +34,7 @@ fun AppScaffold(
     startBar: @Composable () -> Unit = {},
     topBarTitle: String = "概览",
     topBarActions: @Composable RowScope.() -> Unit = {},
+    topBarProgress: @Composable () -> Unit = {},
     content: @Composable () -> Unit = {}
 ) {
     // 检测当前操作系统
@@ -49,6 +50,9 @@ fun AppScaffold(
                 // Right side: TopBar at top, then content fills remaining space
                 Column(modifier = Modifier.fillMaxSize()) {
                     TopBar(title = topBarTitle, actions = topBarActions)
+
+                    // TopBar 下方的进度提示（如后台检查更新）
+                    topBarProgress()
 
                     // 如果是macOS，显示警告
                     if (isMacOS) {

@@ -103,7 +103,23 @@ object PackageManagerUtils {
     /**
      * 检测当前系统的包管理器
      */
-    fun detectPackageManager(): PackageManagerType {
+    /** 进程级缓存：避免工具页多张卡片、多个页面各自 spawn 子进程重复检测 */
+    @Volatile
+    private var cachedPackageManager: PackageManagerType? = null
+
+    /**
+     * 检测当前系统的包管理器。
+     * @param force true 时忽略进程内缓存重新检测（例如用户刚安装了新的包管理器）
+     */
+    fun detectPackageManager(force: Boolean = false): PackageManagerType {
+        if (!force) cachedPackageManager?.let { return it }
+        val detected = detectPackageManagerUncached()
+        cachedPackageManager = detected
+        return detected
+    }
+
+    /** 实际检测逻辑（无缓存） */
+    private fun detectPackageManagerUncached(): PackageManagerType {
         return try {
             val os = System.getProperty("os.name").lowercase()
             // macOS 不支持 Linux/Windows 包管理器，直接返回 UNKNOWN
@@ -221,6 +237,42 @@ object PackageManagerUtils {
         }
     }
     
+    /**
+     * 获取更新「单个包」的命令（带 --noconfirm / -y / --silent 自动确认）
+     */
+    fun getPackageUpdateCommand(manager: PackageManagerType, packageName: String): String? {
+        return when (manager) {
+            PackageManagerType.APT -> "sudo apt-get install --only-upgrade -y $packageName"
+            PackageManagerType.DNF -> "sudo dnf upgrade -y $packageName"
+            PackageManagerType.PACMAN -> "sudo pacman -S --noconfirm $packageName"
+            PackageManagerType.ZYPPER -> "sudo zypper update -y $packageName"
+            PackageManagerType.EMERGE -> "sudo emerge -u --ask=n $packageName"
+            PackageManagerType.NIX -> "nix-env -u $packageName"
+            PackageManagerType.WINGET -> "winget upgrade --silent --accept-package-agreements --accept-source-agreements $packageName"
+            PackageManagerType.SCOOP -> "scoop update $packageName"
+            PackageManagerType.CHOCOLATEY -> "choco upgrade -y $packageName"
+            PackageManagerType.UNKNOWN -> null
+        }
+    }
+
+    /**
+     * 获取卸载「单个包」的命令（带 --noconfirm / -y / --silent 自动确认）
+     */
+    fun getUninstallCommand(manager: PackageManagerType, packageName: String): String? {
+        return when (manager) {
+            PackageManagerType.APT -> "sudo apt-get remove -y $packageName"
+            PackageManagerType.DNF -> "sudo dnf remove -y $packageName"
+            PackageManagerType.PACMAN -> "sudo pacman -R --noconfirm $packageName"
+            PackageManagerType.ZYPPER -> "sudo zypper remove -y $packageName"
+            PackageManagerType.EMERGE -> "sudo emerge --unmerge --ask=n $packageName"
+            PackageManagerType.NIX -> "nix-env -e $packageName"
+            PackageManagerType.WINGET -> "winget uninstall --silent $packageName"
+            PackageManagerType.SCOOP -> "scoop uninstall $packageName"
+            PackageManagerType.CHOCOLATEY -> "choco uninstall -y $packageName"
+            PackageManagerType.UNKNOWN -> null
+        }
+    }
+
     /**
      * 获取包管理器的更新命令（带 --noconfirm / -y 自动确认）
      */
