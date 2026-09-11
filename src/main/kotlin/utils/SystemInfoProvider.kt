@@ -8,9 +8,18 @@
 package utils
 
 import oshi.SystemInfo
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.nio.charset.Charset
+import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
 object SystemInfoProvider {
@@ -19,6 +28,15 @@ object SystemInfoProvider {
     // cached memory frequency (MHz) populated asynchronously to avoid blocking calls
     @Volatile
     private var memFreqMHzCached: Long = 0L
+
+    // 一次性探测的完成标志：首次采集前会等待它们（带超时），以保证首帧数据完整。
+    // bluetooth 用已有的 bluetoothInitialized。
+    @Volatile
+    private var memFreqInitialized: Boolean = false
+    @Volatile
+    private var gpuPresentInitialized: Boolean = false
+    @Volatile
+    private var cellularInitialized: Boolean = false
 
     init {
         detectMemFreqAsync()
@@ -40,6 +58,8 @@ object SystemInfoProvider {
                 val v = detectMemFreq()
                 if (v > 0L) memFreqMHzCached = v
             } catch (_: Exception) {
+            } finally {
+                memFreqInitialized = true
             }
         }
     }
@@ -166,13 +186,7 @@ object SystemInfoProvider {
             } else {
                 Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
             }
-            val reader = BufferedReader(
-                InputStreamReader(process.inputStream, Charset.forName("UTF-8"))
-            )
-            val output = reader.readText()
-            reader.close()
-            process.waitFor()
-            output.trim()
+            runProcessWithTimeout(process, Charset.forName("UTF-8")).trim()
         } catch (e: Exception) {
             ""
         }
@@ -187,14 +201,30 @@ object SystemInfoProvider {
                 // For Linux/macOS, use bash/sh
                 Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
             }
-            val reader = BufferedReader(InputStreamReader(process.inputStream))
-            val output = reader.readText()
-            reader.close()
-            process.waitFor()
-            output.trim()
+            runProcessWithTimeout(process, Charset.defaultCharset()).trim()
         } catch (e: Exception) {
             ""
         }
+    }
+
+    /**
+     * 读取子进程输出，并保证不会无限阻塞：
+     * 看门狗线程在超过 [PROCESS_TIMEOUT_SECONDS] 后强杀进程，管道随之关闭，
+     * 阻塞中的 readText() 自然返回。避免 PowerShell / netsh 卡死导致采集线程永久被占用。
+     */
+    private fun runProcessWithTimeout(process: Process, charset: Charset): String {
+        thread(start = true, isDaemon = true) {
+            try {
+                if (!process.waitFor(PROCESS_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                    process.destroyForcibly()
+                }
+            } catch (_: Exception) {
+            }
+        }
+        val reader = BufferedReader(InputStreamReader(process.inputStream, charset))
+        val output = reader.readText()
+        reader.close()
+        return output
     }
 
     // Cache previous CPU ticks for non-blocking load calculation
@@ -341,7 +371,13 @@ object SystemInfoProvider {
 
     // Start cellular/LTE detection on a background thread (non-blocking).
     private fun refreshCellularAsync() {
-        thread(start = true, isDaemon = true) { refreshCellular() }
+        thread(start = true, isDaemon = true) {
+            try {
+                refreshCellular()
+            } finally {
+                cellularInitialized = true
+            }
+        }
     }
 
     // Detect whether the machine is currently using a cellular (LTE/WWAN)
@@ -453,7 +489,13 @@ object SystemInfoProvider {
 
     // Start present-GPU detection on a background thread (non-blocking).
     private fun refreshPresentGpusAsync() {
-        thread(start = true, isDaemon = true) { refreshPresentGpus() }
+        thread(start = true, isDaemon = true) {
+            try {
+                refreshPresentGpus()
+            } finally {
+                gpuPresentInitialized = true
+            }
+        }
     }
 
     // Populate cachedPresentGpus with the display names of GPUs that are
@@ -867,6 +909,67 @@ object SystemInfoProvider {
         )
     }
 
+    // ---- 快照采集（供后台刷新循环调用）----
+
+    /**
+     * 等待一次性探测结束，最多 [INITIAL_DATA_TIMEOUT_MS]。
+     * 首次进入主页时的转圈即覆盖这段等待，因此首帧拿到的就是完整数据；
+     * 探测失败或超时也会继续（best-effort），保证转圈不会无限转。
+     * 等待期间会持续上报"仍在探测的项目"供 UI 显示。
+     */
+    private suspend fun awaitInitialData(timeoutMs: Long = INITIAL_DATA_TIMEOUT_MS) {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (true) {
+            val pending = pendingProbeLabels()
+            if (pending.isEmpty() || System.currentTimeMillis() >= deadline) break
+            updateLoadingStage("正在探测硬件信息：${pending.joinToString("、")}")
+            delay(50)
+        }
+    }
+
+    /** 尚未完成的一次性探测项（中文标签） */
+    private fun pendingProbeLabels(): List<String> = buildList {
+        if (!memFreqInitialized) add("内存频率")
+        if (!gpuPresentInitialized) add("显卡设备")
+        if (!bluetoothInitialized) add("蓝牙适配器")
+        if (!cellularInitialized) add("蜂窝网络")
+    }
+
+    /**
+     * 采集一次全部系统信息。
+     * **必须在后台线程调用**（首次调用会触发 OSHI 初始化）。
+     * 首次采集时会逐步上报"当前正在获取的项目"，供加载占位显示。
+     */
+    suspend fun collectSnapshot(): SystemSnapshot {
+        val reportStage = _systemSnapshotFlow.value == null
+        if (reportStage) awaitInitialData()
+
+        if (reportStage) updateLoadingStage("正在读取：处理器、内存与磁盘")
+        val systemInfo = getSystemInfo()
+        if (reportStage) updateLoadingStage("正在读取：系统概览")
+        val overview = getSystemOverview()
+        if (reportStage) updateLoadingStage("正在读取：网络状态")
+        val networkIO = getNetworkIO()
+        if (reportStage) updateLoadingStage("正在读取：进程与登录用户")
+        val services = getServices()
+        if (reportStage) updateLoadingStage("正在读取：电池")
+        val battery = getBattery()
+        if (reportStage) updateLoadingStage("正在读取：屏幕")
+        val screen = getScreen()
+        if (reportStage) updateLoadingStage("正在读取：蓝牙适配器")
+        val bluetooth = getBluetooth()
+
+        return SystemSnapshot(
+            systemInfo = systemInfo,
+            overview = overview,
+            networkIO = networkIO,
+            services = services,
+            battery = battery,
+            screen = screen,
+            bluetooth = bluetooth
+        )
+    }
+
     fun getSystemOverview(): SystemOverview {
         val os = si.operatingSystem
         val architecture = System.getProperty("os.arch") ?: "Unknown"
@@ -917,5 +1020,55 @@ object SystemInfoProvider {
             computerName = computerName,
             wallpaperPath = wallpaperPath
         )
+    }
+}
+
+// ============================================================================
+// 后台采集：与 UI 线程解耦
+// ============================================================================
+
+/** 一次采集得到的全部系统信息（不可变快照） */
+data class SystemSnapshot(
+    val systemInfo: SystemInfoSnapshot,
+    val overview: SystemOverview,
+    val networkIO: NetworkIOInfo,
+    val services: ServicesInfo,
+    val battery: BatteryInfo,
+    val screen: ScreenInfo,
+    val bluetooth: BluetoothInfo
+)
+
+/** 首次采集等待一次性探测的上限 */
+private const val INITIAL_DATA_TIMEOUT_MS = 5_000L
+
+/** 子进程看门狗超时（秒） */
+private const val PROCESS_TIMEOUT_SECONDS = 10L
+
+// 文件级声明：UI 侧读取它们不会触发 SystemInfoProvider 的 object 初始化，
+// 因此不会在 UI 线程上构造 OSHI。
+private val _systemSnapshotFlow = MutableStateFlow<SystemSnapshot?>(null)
+
+/** UI 只读这个；null 表示首次数据尚未就绪（此时显示转圈） */
+val systemSnapshotFlow: StateFlow<SystemSnapshot?> = _systemSnapshotFlow.asStateFlow()
+
+/** 首次读取期间"当前正在获取的项目"（仅供加载占位显示副文本） */
+private val _loadingStageFlow = MutableStateFlow<String?>(null)
+val systemInfoLoadingStage: StateFlow<String?> = _loadingStageFlow.asStateFlow()
+
+/** 仅在文案变化时发布，避免无谓的刷新触发重组 */
+private fun updateLoadingStage(text: String) {
+    if (_loadingStageFlow.value != text) _loadingStageFlow.value = text
+}
+
+/**
+ * 后台刷新循环：在 IO 线程采集并发布快照，UI 线程只接收结果。
+ * 由主页的 LaunchedEffect 驱动，离开主页即取消（不空转）；已发布的快照会保留，
+ * 因此再次进入主页可以瞬间渲染而无需等待。
+ */
+suspend fun runSystemInfoRefreshLoop() {
+    while (currentCoroutineContext().isActive) {
+        val snapshot = withContext(Dispatchers.IO) { SystemInfoProvider.collectSnapshot() }
+        _systemSnapshotFlow.value = snapshot
+        delay(1000)
     }
 }
