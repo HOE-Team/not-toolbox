@@ -38,6 +38,10 @@ dependencies {
     implementation("org.jetbrains.skiko:skiko-awt-runtime-linux-x64:0.144.6")
     // Compose 资源库（生成 Res 类，替换弃用的 painterResource(String)）
     implementation("org.jetbrains.compose.components:components-resources:1.11.1")
+    // Markdown 渲染（Compose Multiplatform 版：Android 端即 Markwon，桌面端用 JetBrains markdown 解析）
+    implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.45.0")
+    // 代码块语法高亮（可选模块，给 AI 回答里的代码块上色并带语言 + 复制按钮）
+    implementation("com.mikepenz:multiplatform-markdown-renderer-code:0.45.0")
     implementation("com.github.oshi:oshi-core:7.3.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")

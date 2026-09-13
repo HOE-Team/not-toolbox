@@ -5,18 +5,20 @@
 // Based on: NNETB (©2026 HOE Team, MIT License) and NNETB-For-Linux (©2026 HOE Team, GPL-3.0 License)
 // License: GPL-3.0 (see LICENSE file for details)
 //
-// AI 助手页：模型配置 + 对话（流式输出 / 思考块 / 工具调用块）
+// AI 助手页：模型配置 + 对话（流式输出 / 思考段 / 工具调用卡片 / 线性时间线）
 
 package screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
@@ -24,6 +26,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.text.font.FontFamily
@@ -96,8 +102,8 @@ fun AiScreen(
         }
     }
 
-    // 新消息到达时滚到底部
-    LaunchedEffect(messages.size, messages.lastOrNull()?.text) {
+    // 新消息到达、正文增长或时间线卡片增长时滚到底部
+    LaunchedEffect(messages.size, messages.lastOrNull()?.text, timelineRevision(messages.lastOrNull())) {
         if (messages.isNotEmpty()) {
             try {
                 listState.animateScrollToItem(messages.size - 1)
@@ -120,8 +126,11 @@ fun AiScreen(
 
     val liveMessage = messages.lastOrNull()
     val liveReceivedChars = if (busy) liveMessage?.text?.length ?: 0 else 0
+    // 时间线上可能有多个思考段，这里累计所有思考段的字数
     val liveThinkingChars = if (busy) {
-        liveMessage?.segments?.filterIsInstance<ChatSegment.Thinking>()?.firstOrNull()?.text?.length ?: 0
+        liveMessage?.segments
+            ?.filterIsInstance<ChatSegment.Thinking>()
+            ?.sumOf { it.text.length } ?: 0
     } else {
         0
     }
@@ -216,12 +225,12 @@ fun AiScreen(
                 ).also { agent = it }
             }
 
-            val segments = mutableListOf<ChatSegment>()
-            val thinking = StringBuilder()
+            // 分段即时间线：只按发生顺序追加，界面按列表顺序自上而下渲染
+            val timeline = ChatTimeline()
             var body = ""
 
             fun publish() {
-                val snapshotSegments = segments.toList()
+                val snapshotSegments = timeline.segments
                 messages = messages.map { message ->
                     if (message.id == assistantId) {
                         message.copy(text = body, segments = snapshotSegments, streaming = true)
@@ -235,46 +244,29 @@ fun AiScreen(
                 current.send(text).collect { event ->
                     when (event) {
                         is ChatEvent.AssistantText -> {
+                            // 正文开始输出 → 当前思考段封口，后续推理会另起一段
+                            timeline.sealThinking()
                             body = event.text
                             publish()
                         }
 
                         is ChatEvent.ReasoningDelta -> {
-                            thinking.append(event.text)
-                            val segment = ChatSegment.Thinking(thinking.toString())
-                            val index = segments.indexOfFirst { it is ChatSegment.Thinking }
-                            if (index >= 0) segments[index] = segment else segments.add(0, segment)
+                            timeline.thinkingDelta(event.text)
                             publish()
                         }
 
                         is ChatEvent.ToolStarted -> {
-                            segments.add(ChatSegment.ToolCallSegment(call = event.call, pending = true))
+                            timeline.toolStarted(event.call)
                             publish()
                         }
 
                         is ChatEvent.ToolCallUpdated -> {
-                            // 容器已提前建好，这里只把完整参数补进同一个容器
-                            val index = segments.indexOfLast {
-                                it is ChatSegment.ToolCallSegment && it.pending && it.call.tool == event.call.tool
-                            }
-                            if (index >= 0) {
-                                val existing = segments[index] as ChatSegment.ToolCallSegment
-                                segments[index] = existing.copy(call = event.call)
-                                publish()
-                            }
+                            timeline.toolCallUpdated(event.call)
+                            publish()
                         }
 
                         is ChatEvent.ToolFinished -> {
-                            val index = segments.indexOfFirst {
-                                it is ChatSegment.ToolCallSegment && it.pending && it.call.tool == event.call.tool
-                            }
-                            val finished = ChatSegment.ToolCallSegment(
-                                call = event.call,
-                                result = event.result,
-                                durationMs = event.durationMs,
-                                pending = false
-                            )
-                            if (index >= 0) segments[index] = finished else segments.add(finished)
+                            timeline.toolFinished(event.call, event.result, event.durationMs)
                             publish()
                         }
 
@@ -302,7 +294,9 @@ fun AiScreen(
                     }
                 }
             } finally {
-                val snapshotSegments = segments.toList()
+                // 收尾：最后一段思考若还在增长则封口，避免界面一直显示「思考中」
+                timeline.sealThinking()
+                val snapshotSegments = timeline.segments
                 messages = messages.map { item ->
                     if (item.id == assistantId) {
                         item.copy(text = body, segments = snapshotSegments, streaming = false)
@@ -594,7 +588,11 @@ private fun AiEmptyState(configured: Boolean, onAddModel: () -> Unit) {
     }
 }
 
-/** 单条消息：工具调用与思考过程各自独立成容器，气泡里只放正文（不出现 CALL 源文本） */
+/**
+ * 单条消息。助手消息渲染成一条**线性时间线**：思考卡片 / 工具调用卡片按发生顺序
+ * （[ChatMessage.segments] 的列表顺序）自上而下排列，正文作为最后一个节点；
+ * 气泡里只放正文，不出现 CALL 源文本。
+ */
 @Composable
 private fun AiMessageBubble(
     message: ChatMessage,
@@ -614,94 +612,294 @@ private fun AiMessageBubble(
         )
         Spacer(modifier = Modifier.height(4.dp))
 
-        if (!isUser) {
-            if (showReasoning) {
-                message.segments.filterIsInstance<ChatSegment.Thinking>().forEach { block ->
-                    AiThinkingBlock(block.text)
-                    Spacer(modifier = Modifier.height(6.dp))
-                }
+        if (isUser) {
+            if (message.text.isNotBlank()) {
+                AiTextBubble(text = message.text, streaming = false, error = null, isUser = true)
             }
-            message.segments.filterIsInstance<ChatSegment.ToolCallSegment>().forEach { segment ->
-                AiToolCallBlock(
-                    segment = segment,
-                    showResult = showToolResults,
-                    onNavigateToTerminal = onNavigateToTerminal
-                )
-                Spacer(modifier = Modifier.height(6.dp))
+        } else {
+            AiTimeline(
+                message = message,
+                showReasoning = showReasoning,
+                showToolResults = showToolResults,
+                onNavigateToTerminal = onNavigateToTerminal
+            )
+        }
+    }
+}
+
+/** 时间线内容指纹（分段数量 + 各分段文本长度）：用于判断过程中是否需要跟随滚动 */
+private fun timelineRevision(message: ChatMessage?): Int {
+    if (message == null) return 0
+    var sum = message.segments.size * 31
+    message.segments.forEach { segment ->
+        sum += when (segment) {
+            is ChatSegment.Thinking -> segment.text.length
+            is ChatSegment.ToolCallSegment -> segment.call.tool.length + (segment.result?.text?.length ?: 0)
+        }
+    }
+    return sum
+}
+
+/** 时间线节点配色：思考用主题色；工具按 只读 / 写操作 / 出错 区分，与卡片边框、图标保持一致 */
+@Composable
+private fun timelineAccent(segment: ChatSegment): Color {
+    if (segment !is ChatSegment.ToolCallSegment) return MaterialTheme.colorScheme.primary
+    val spec = ToolRegistry.specOf(segment.call.tool)
+    val isWrite = spec != null && spec.danger != ToolDanger.READ
+    val isError = segment.result?.isError == true || spec == null
+    return when {
+        isError -> MaterialTheme.colorScheme.error
+        isWrite -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.primary
+    }
+}
+
+/**
+ * 助手回答的线性时间线：[ChatMessage.segments] 里的分段按**发生顺序**自上而下排列，
+ * 正文（回答）作为最后一个节点接在同一条竖线上。
+ *
+ * 卡片顺序完全由 `segments` 的列表顺序决定（累积事件时只追加、不插队），
+ * 因此「思考 → 工具 → 思考 → 工具 → 正文」会如实呈现，不会把思考全挤到最前面。
+ */
+@Composable
+private fun AiTimeline(
+    message: ChatMessage,
+    showReasoning: Boolean,
+    showToolResults: Boolean,
+    onNavigateToTerminal: () -> Unit
+) {
+    val nodes = message.segments.filter { segment ->
+        when (segment) {
+            is ChatSegment.Thinking -> showReasoning && segment.text.isNotBlank()
+            is ChatSegment.ToolCallSegment -> true
+        }
+    }
+    val bubbleVisible = message.text.isNotBlank() || message.streaming || message.error != null
+    // 没有卡片（只有正文）时不画时间线，保持原来的单气泡外观
+    val railVisible = nodes.isNotEmpty()
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        nodes.forEachIndexed { index, segment ->
+            AiTimelineNode(
+                order = index + 1,
+                accent = timelineAccent(segment),
+                rail = railVisible,
+                showTopLine = railVisible && index > 0,
+                showBottomLine = railVisible && (index < nodes.size - 1 || bubbleVisible)
+            ) {
+                when (segment) {
+                    is ChatSegment.Thinking -> AiThinkingBlock(
+                        text = segment.text,
+                        autoExpand = segment.streaming && message.text.isBlank()
+                    )
+
+                    is ChatSegment.ToolCallSegment -> AiToolCallBlock(
+                        segment = segment,
+                        showResult = showToolResults,
+                        onNavigateToTerminal = onNavigateToTerminal
+                    )
+                }
             }
         }
 
-        val bubbleVisible = message.text.isNotBlank() || message.streaming || message.error != null
         if (bubbleVisible) {
-            Surface(
-                color = if (isUser) {
-                    MaterialTheme.colorScheme.primaryContainer
-                } else {
-                    MaterialTheme.colorScheme.surfaceVariant
-                },
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.widthIn(max = 760.dp)
+            AiTimelineNode(
+                order = nodes.size + 1,
+                accent = MaterialTheme.colorScheme.primary,
+                rail = railVisible,
+                showTopLine = railVisible,
+                showBottomLine = false
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    if (message.text.isNotBlank()) {
-                        SelectionContainer {
-                            Text(text = message.text, style = MaterialTheme.typography.bodyMedium)
-                        }
-                    }
-
-                    if (message.streaming && message.text.isBlank()) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "正在生成…",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    message.error?.let { error ->
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "⚠ " + error,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
+                AiTextBubble(
+                    text = message.text,
+                    streaming = message.streaming,
+                    error = message.error,
+                    isUser = false
+                )
             }
         }
     }
 }
 
-/** 思考块（默认折叠） */
+/**
+ * 时间线上的一个节点：左侧是竖线与序号圆点，右侧是卡片内容。
+ *
+ * 竖线用 [drawBehind] 按节点实际高度绘制（从上一个节点一路连到下一个节点）；
+ * 节点之间不放外部间距（间距放在内容内部的底部），否则竖线会断开。
+ */
 @Composable
-private fun AiThinkingBlock(text: String) {
-    var expanded by remember { mutableStateOf(false) }
+private fun AiTimelineNode(
+    order: Int,
+    accent: Color,
+    rail: Boolean,
+    showTopLine: Boolean,
+    showBottomLine: Boolean,
+    content: @Composable () -> Unit
+) {
+    val railWidth = 30.dp
+    val badgeSize = 18.dp
+    val badgeTop = 12.dp
+    val lineColor = MaterialTheme.colorScheme.outlineVariant
+    val badgeFill = MaterialTheme.colorScheme.background
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .drawBehind {
+                if (!rail) return@drawBehind
+                val centerX = railWidth.toPx() / 2f
+                val lineWidth = 2.dp.toPx()
+                val badgeBottom = (badgeTop + badgeSize).toPx()
+                if (showTopLine) {
+                    drawRect(
+                        color = lineColor,
+                        topLeft = Offset(centerX - lineWidth / 2f, 0f),
+                        size = Size(lineWidth, badgeBottom)
+                    )
+                }
+                if (showBottomLine) {
+                    drawRect(
+                        color = lineColor,
+                        topLeft = Offset(centerX - lineWidth / 2f, badgeBottom),
+                        size = Size(lineWidth, (size.height - badgeBottom).coerceAtLeast(0f))
+                    )
+                }
+            }
+    ) {
+        if (rail) {
+            Column(
+                modifier = Modifier.width(railWidth).padding(top = badgeTop),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // 圆点用页面底色填充，正好盖住下面的竖线
+                Box(
+                    modifier = Modifier
+                        .size(badgeSize)
+                        .clip(CircleShape)
+                        .background(badgeFill)
+                        .border(BorderStroke(1.dp, accent), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = order.toString(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = accent
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+        }
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .padding(bottom = if (rail) 8.dp else 0.dp)
+        ) { content() }
+    }
+}
+
+/** 正文气泡：用户消息与助手回答共用，只有配色与是否显示进度 / 错误不同 */
+@Composable
+private fun AiTextBubble(
+    text: String,
+    streaming: Boolean,
+    error: String?,
+    isUser: Boolean
+) {
+    Surface(
+        color = if (isUser) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant
+        },
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.widthIn(max = 760.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            if (text.isNotBlank()) {
+                SelectionContainer {
+                    Text(text = text, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+
+            if (streaming && text.isBlank()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "正在生成…",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            error?.let { message ->
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "⚠ " + message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+    }
+}
+
+
+/**
+ * 思考过程容器（与工具调用容器同款外观）。
+ * 思考正在流式且正文还没开始时自动展开，让过程可见；用户手动点过之后以其选择为准。
+ */
+@Composable
+private fun AiThinkingBlock(text: String, autoExpand: Boolean) {
+    var userExpanded by remember { mutableStateOf<Boolean?>(null) }
+    val expanded = userExpanded ?: autoExpand
+    val accent = MaterialTheme.colorScheme.primary
+
     Surface(
         color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(8.dp),
-        modifier = Modifier.fillMaxWidth()
+        shape = RoundedCornerShape(10.dp),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.35f)),
+        modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp)
     ) {
-        Column(modifier = Modifier.padding(10.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
             Row(
-                modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+                modifier = Modifier.fillMaxWidth().clickable { userExpanded = !expanded },
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                if (autoExpand) {
+                    CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(
+                        imageVector = MaterialSymbols.Neurology,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = accent
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Surface(color = accent.copy(alpha = 0.12f), shape = RoundedCornerShape(6.dp)) {
+                    Text(
+                        text = "思考过程",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = accent,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "思考过程",
+                    text = text.length.toString() + " 字" + if (autoExpand) " · 思考中" else "",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                Spacer(modifier = Modifier.weight(1f))
                 Text(
                     text = if (expanded) "收起" else "展开",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary
+                    color = accent
                 )
             }
-            if (expanded) {
+            if (expanded && text.isNotBlank()) {
                 Spacer(modifier = Modifier.height(6.dp))
                 SelectionContainer {
                     Text(
@@ -731,7 +929,10 @@ private fun AiToolCallBlock(
         isWrite -> MaterialTheme.colorScheme.tertiary
         else -> MaterialTheme.colorScheme.primary
     }
-    var expanded by remember { mutableStateOf(false) }
+    // 长结果展开状态
+    var resultExpanded by remember { mutableStateOf(false) }
+    // 整个容器是否折叠（点击标题行切换）
+    var collapsed by remember { mutableStateOf(false) }
 
     Surface(
         color = MaterialTheme.colorScheme.surface,
@@ -740,7 +941,10 @@ private fun AiToolCallBlock(
         modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp)
     ) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable { collapsed = !collapsed },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 if (segment.pending) {
                     CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
                 } else {
@@ -780,50 +984,58 @@ private fun AiToolCallBlock(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            }
-
-            val args = segment.call.arguments.entries.joinToString("   ") { entry ->
-                entry.key + "=" + entry.value.toString().trim('"')
-            }
-            if (args.isNotBlank()) {
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = args,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = if (collapsed) "展开" else "收起",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
 
-            val result = segment.result
-            if (result != null && showResult) {
-                Spacer(modifier = Modifier.height(6.dp))
-                val full = result.text
-                val visible = if (expanded || full.length <= 400) full else full.take(400) + "…"
-                SelectionContainer {
+            if (!collapsed) {
+                val args = segment.call.arguments.entries.joinToString("   ") { entry ->
+                    entry.key + "=" + entry.value.toString().trim('"')
+                }
+                if (args.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = visible,
+                        text = args,
                         style = MaterialTheme.typography.bodySmall,
                         fontFamily = FontFamily.Monospace,
-                        color = if (result.isError) {
-                            MaterialTheme.colorScheme.error
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        }
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                if (full.length > 400) {
-                    TextButton(onClick = { expanded = !expanded }) {
-                        Text(if (expanded) "收起结果" else "展开完整结果（" + full.length + " 字符）")
+
+                val result = segment.result
+                if (result != null && showResult) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    val full = result.text
+                    val visible = if (resultExpanded || full.length <= 400) full else full.take(400) + "…"
+                    SelectionContainer {
+                        Text(
+                            text = visible,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            color = if (result.isError) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    }
+                    if (full.length > 400) {
+                        TextButton(onClick = { resultExpanded = !resultExpanded }) {
+                            Text(if (resultExpanded) "收起结果" else "展开完整结果（" + full.length + " 字符）")
+                        }
                     }
                 }
-            }
 
-            if (isWrite && !segment.pending) {
-                TextButton(onClick = onNavigateToTerminal) {
-                    Icon(MaterialSymbols.Terminal2, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("在终端查看输出")
+                if (isWrite && !segment.pending) {
+                    TextButton(onClick = onNavigateToTerminal) {
+                        Icon(MaterialSymbols.Terminal2, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("在终端查看输出")
+                    }
                 }
             }
         }

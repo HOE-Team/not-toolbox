@@ -4,6 +4,7 @@ import icons.robot_2
 import icons.brightness_empty
 import main.kotlin.icons.*
 import androidx.compose.ui.graphics.vector.ImageVector
+import icons.neurology
 
 /**
  * 统一的 Material Symbols 图标管理对象。
@@ -203,4 +204,7 @@ object MaterialSymbols {
 
     /** Robot2（AI 助手）**/
     val Robot2: ImageVector = robot_2
+
+    /**Neurology**/
+    val Neurology: ImageVector = neurology
 }

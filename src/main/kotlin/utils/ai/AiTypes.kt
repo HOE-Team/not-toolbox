@@ -131,10 +131,17 @@ data class ToolResult(
 )
 
 /**
- * 助手消息中的分段：思考块 / 工具调用块，按发生顺序堆叠。
+ * 助手消息中的分段：思考块 / 工具调用块。
+ *
+ * 分段列表就是一条**线性时间线**：列表顺序 = 界面展示顺序，
+ * 因此调用方只能按发生顺序**追加**分段（不能插队），界面按列表顺序自上而下渲染。
+ *
+ * 一段思考 = 一次连续的推理输出：正文开始输出或开始调用工具即结束该段，
+ * 之后的推理增量会新起一段（否则多轮思考会粘成一块，时间线就错位了）。
  */
 sealed class ChatSegment {
-    data class Thinking(val text: String) : ChatSegment()
+    /** 一段思考；[streaming] 为 true 表示这段还在增长（界面显示「思考中」并自动展开） */
+    data class Thinking(val text: String, val streaming: Boolean = false) : ChatSegment()
 
     data class ToolCallSegment(
         val call: ToolCall,
