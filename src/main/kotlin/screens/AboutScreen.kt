@@ -86,12 +86,12 @@ fun AboutScreen() {
         )
         Spacer(modifier = Modifier.height(12.dp))
         Text(
-            text = "分发渠道：O(Beta)-ReleaseCandidate",
+            text = "分发渠道：O(Beta)-Snapshot",
             style = MaterialTheme.typography.bodyMedium
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "版本：O-1.0.6",
+            text = "版本：O-1.0.7",
             style = MaterialTheme.typography.bodyMedium
         )
 

@@ -1,5 +1,7 @@
 package components
 
+import icons.robot_2
+import icons.brightness_empty
 import main.kotlin.icons.*
 import androidx.compose.ui.graphics.vector.ImageVector
 
@@ -118,6 +120,9 @@ object MaterialSymbols {
     /** 空仪表盘 */
     val EmptyDashboard: ImageVector = empty_dashboard
 
+    /** 空状态（未配置 / 无内容） */
+    val BrightnessEmpty: ImageVector = brightness_empty
+
     /** 流程图 */
     val Flowchart: ImageVector = flowchart
 
@@ -195,4 +200,7 @@ object MaterialSymbols {
 
     /**Signal Cellular 3 Bar**/
     val SignalCellular3Bar = signal_cellular_3_bar
+
+    /** Robot2（AI 助手）**/
+    val Robot2: ImageVector = robot_2
 }

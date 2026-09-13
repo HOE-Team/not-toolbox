@@ -7,53 +7,30 @@
 
 package main.kotlin
 
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.window.singleWindowApplication
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import components.MaterialSymbols
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberWindowState
 import components.AppScaffold
+import components.MaterialSymbols
 import components.NavRail
-import screens.HomeScreen
-import screens.ToolsScreen
-import screens.SettingsScreen
-import screens.AboutScreen
-import screens.TerminalScreen
-import theme.AppTheme
-import config.loadConfig
-import config.saveConfig
-import config.AppConfig
-import config.WallpaperState
-import config.ToolCommandSessionMode
-import config.GreetingMode
+import config.*
+import kotlinx.coroutines.launch
 import ntb.generated.resources.Res
 import ntb.generated.resources.logo
 import org.jetbrains.compose.resources.painterResource
-import androidx.compose.ui.window.application
-import androidx.compose.ui.window.Window
-import androidx.compose.ui.window.rememberWindowState
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.dp
+import screens.*
+import theme.AppTheme
+import utils.*
 import java.awt.Dimension
 import java.time.LocalTime
-import utils.PackageManagerType
-import utils.PackageManagerUtils
-import utils.PackageDetector
-import utils.UpdateChecker
-import utils.UpdateCheckStatus
-import utils.TerminalSessionManager
-import utils.CardBgManager
-import kotlinx.coroutines.launch
 
 // 编译时常量：true=启用本地DEBUG包列表，false=从远程拉取
 const val IS_DEBUG = false
@@ -64,10 +41,10 @@ const val IS_DEBUG = false
  */
 private fun greetingForOverview(customName: String?): String {
     val hour = LocalTime.now().hour
-    val greeting = when {
-        hour in 5..11 -> "早上好"
-        hour in 12..13 -> "中午好"
-        hour in 14..17 -> "下午好"
+    val greeting = when (hour) {
+        in 5..11 -> "早上好"
+        in 12..13 -> "中午好"
+        in 14..17 -> "下午好"
         else -> "晚上好"
     }
     // 自定义称谓优先；未设置则用系统用户名；再不行用"用户"
@@ -94,7 +71,6 @@ private fun resolveGreeting(
     return greetingForOverview(displayName)
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 fun main() = application {
     val windowState =  rememberWindowState(width = 1280.dp, height = 600.dp)
     Window(
@@ -122,7 +98,7 @@ fun main() = application {
         // load persisted settings
         val loaded = loadConfig()
         var isDark by remember { mutableStateOf(loaded.dark) }
-        var seedHex by remember { mutableStateOf<String?>(loaded.color) }
+        var seedHex by remember { mutableStateOf(loaded.color) }
         var useProxy by remember { mutableStateOf(loaded.useProxy) }
         var proxyUrl by remember { mutableStateOf(loaded.proxyUrl) }
         // 包管理器选择状态（默认自动检测）
@@ -190,7 +166,8 @@ fun main() = application {
             1 -> "工具"
             2 -> "终端"
             3 -> "设置"
-            4 -> "关于"
+            4 -> "AI助手"
+            5 -> "关于"
             else -> resolveGreeting(GreetingMode.fromName(greetingMode), displayName, customGreeting)
         }
 
@@ -272,7 +249,7 @@ fun main() = application {
                         },
                         selectedColor = seedHex ?: "",
                         onColorChange = { hex ->
-                            seedHex = if (hex.isBlank()) null else hex
+                            seedHex = hex.ifBlank { null }
                             persist()
                         },
                         selectedPackageManager = selectedPackageManager,
@@ -338,7 +315,14 @@ fun main() = application {
                             persist()
                         }
                     )
-                    4 -> AboutScreen()
+                    4 -> AiScreen(
+                        selectedPackageManager = selectedPackageManager,
+                        useProxy = useProxy,
+                        proxyUrl = proxyUrl,
+                        isDebug = IS_DEBUG,
+                        onNavigateToTerminal = { selectedNavIndex = 2 }
+                    )
+                    5 -> AboutScreen()
                     else -> HomeScreen()
                 }
             }

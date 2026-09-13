@@ -940,8 +940,15 @@ object SystemInfoProvider {
      * **必须在后台线程调用**（首次调用会触发 OSHI 初始化）。
      * 首次采集时会逐步上报"当前正在获取的项目"，供加载占位显示。
      */
-    suspend fun collectSnapshot(): SystemSnapshot {
-        val reportStage = _systemSnapshotFlow.value == null
+    /**
+     * 采集一次系统快照。
+     *
+     * @param waitForInitialData 是否等待首页的冷启动数据（首次采集时可能会阻塞数秒，
+     *   并占用加载进度文案）。首页轮询用默认的 true；AI 助手等后台调用传 false，
+     *   避免阻塞对话并避免覆盖首页的加载阶段提示。
+     */
+    suspend fun collectSnapshot(waitForInitialData: Boolean = true): SystemSnapshot {
+        val reportStage = waitForInitialData && _systemSnapshotFlow.value == null
         if (reportStage) awaitInitialData()
 
         if (reportStage) updateLoadingStage("正在读取：处理器、内存与磁盘")

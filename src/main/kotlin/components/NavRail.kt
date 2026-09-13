@@ -30,7 +30,8 @@ fun NavRail(
             NavigationRailItem(selected = selectedIndex == 1, onClick = { onSelection(1) }, icon = { Icon(MaterialSymbols.Build, contentDescription = "Tools") }, label = { Text("工具") })
             NavigationRailItem(selected = selectedIndex == 2, onClick = { onSelection(2) }, icon = { Icon(MaterialSymbols.Terminal, contentDescription = "Terminal") }, label = { Text("终端") })
             NavigationRailItem(selected = selectedIndex == 3, onClick = { onSelection(3) }, icon = { Icon(MaterialSymbols.Settings, contentDescription = "Settings") }, label = { Text("设置") })
-            NavigationRailItem(selected = selectedIndex == 4, onClick = { onSelection(4) }, icon = { Icon(MaterialSymbols.Info, contentDescription = "About") }, label = { Text("关于") })
+            NavigationRailItem(selected = selectedIndex == 4, onClick = { onSelection(4) }, icon = { Icon(MaterialSymbols.Robot2, contentDescription = "AI") }, label = { Text("AI") })
+            NavigationRailItem(selected = selectedIndex == 5, onClick = { onSelection(5) }, icon = { Icon(MaterialSymbols.Info, contentDescription = "About") }, label = { Text("关于") })
         }
     }
 }
