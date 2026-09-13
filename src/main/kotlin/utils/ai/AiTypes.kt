@@ -53,7 +53,7 @@ enum class SystemContextDetail(val displayName: String) {
 enum class ThinkingMode(val displayName: String) {
     AUTO("默认（不发送该参数）"),
     ENABLED("启用思考"),
-    DISABLED("关闭思考（更快、正文立即流式）")
+    DISABLED("关闭思考（更快）")
 }
 
 /**

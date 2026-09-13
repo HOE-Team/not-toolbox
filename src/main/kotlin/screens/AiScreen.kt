@@ -40,6 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import components.MarkdownText
 import components.MaterialSymbols
 import config.loadAiConfig
 import config.saveAiConfig
@@ -47,6 +48,7 @@ import kotlinx.coroutines.*
 import utils.PackageManagerType
 import utils.PackageManagerUtils
 import utils.ai.*
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * AI 助手页。
@@ -119,7 +121,7 @@ fun AiScreen(
     LaunchedEffect(busy) {
         elapsedMs = 0
         while (busy) {
-            delay(200)
+            delay(200.milliseconds)
             elapsedMs += 200
         }
     }
@@ -488,7 +490,7 @@ private fun AiTopBar(
             Text("系统上下文")
         }
         TextButton(onClick = onNewConversation, enabled = hasMessages) {
-            Icon(MaterialSymbols.ClearAll, contentDescription = null, modifier = Modifier.size(16.dp))
+            Icon(MaterialSymbols.Add, contentDescription = null, modifier = Modifier.size(16.dp))
             Spacer(modifier = Modifier.width(6.dp))
             Text("新对话")
         }
@@ -578,8 +580,7 @@ private fun AiEmptyState(configured: Boolean, onAddModel: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "可以直接询问本机软件与系统状态，也可以让它帮你安装、更新、卸载软件包。\n" +
-                    "会修改系统的操作在执行前都会先弹窗征求你的同意。",
+                text = "让它帮你操作包管理器、提供解决方案或是聊天。",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -816,8 +817,13 @@ private fun AiTextBubble(
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             if (text.isNotBlank()) {
-                SelectionContainer {
-                    Text(text = text, style = MaterialTheme.typography.bodyMedium)
+                if (isUser) {
+                    SelectionContainer {
+                        Text(text = text, style = MaterialTheme.typography.bodyMedium)
+                    }
+                } else {
+                    // 助手回答按 Markdown 渲染（标题 / 列表 / 表格 / 代码块 / 链接等）
+                    MarkdownText(text = text)
                 }
             }
 
@@ -836,7 +842,7 @@ private fun AiTextBubble(
             error?.let { message ->
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "⚠ " + message,
+                    text = "⚠ $message",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error
                 )
@@ -968,7 +974,7 @@ private fun AiToolCallBlock(
                 if (isWrite) {
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = if (spec?.danger == ToolDanger.SHELL) "终端命令" else "写操作",
+                        text = if (spec.danger == ToolDanger.SHELL) "终端命令" else "写操作",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.tertiary
                     )
@@ -1600,7 +1606,7 @@ private fun AiModelForm(
         )
         AiSwitchRow(
             title = "修改系统的操作需要确认",
-            subtitle = "安装 / 更新 / 卸载 / 执行命令前弹窗征求同意（强烈建议保持开启）",
+            subtitle = "安装 / 更新 / 卸载 / 执行命令前弹窗征求同意（建议保持开启）",
             checked = model.confirmWriteOps,
             onCheckedChange = { onModelChange(model.copy(confirmWriteOps = it)) }
         )
@@ -1647,7 +1653,7 @@ private fun AiModelForm(
                 value = model.thinkingMode.displayName,
                 onValueChange = {},
                 readOnly = true,
-                label = { Text("思考模式（DeepSeek 生效）") },
+                label = { Text("思考模式") },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = thinkingExpanded) },
                 colors = ExposedDropdownMenuDefaults.textFieldColors(),
                 modifier = Modifier
@@ -1670,9 +1676,7 @@ private fun AiModelForm(
         Spacer(modifier = Modifier.height(6.dp))
 
         Text(
-            text = "DeepSeek 等网关若不显式传 thinking，可能默认开始「思考」：这段时间只回传推理内容、正文迟迟不出现，" +
-                "看起来就像一次性吐出。默认的「关闭思考」会让正文立即开始流式；若该网关不支持此参数并报错，" +
-                "改成「默认」即可。",
+            text = "DeepSeek 等网关若不显式传 thinking，可能默认开始「思考」若该网关不支持此参数并报错，请改为「默认」。",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

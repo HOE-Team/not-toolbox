@@ -48,7 +48,7 @@ object SecretStore {
 
     /** 供界面展示的当前保护级别说明 */
     fun protectionDescription(): String {
-        if (isWindows) return "Windows DPAPI（绑定当前用户）"
+        if (isWindows) return "Windows DPAPI（当前用户）"
         if (isLinux && findExecutable("secret-tool") != null) return "系统密钥环（libsecret）"
         return "本机 AES-256-GCM（未接入系统密钥环）"
     }
