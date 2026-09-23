@@ -12,10 +12,13 @@ import config.InstalledPackageEntry
 import config.installedPackagesFileExists
 import config.loadInstalledPackages
 import config.saveInstalledPackages
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -84,6 +87,15 @@ object PackageDetector {
     /** 本进程内各包管理器的快照；切回已检测过的管理器时零 IO 秒显 */
     private val sessionSnapshots = mutableMapOf<PackageManagerType, InstalledSnapshot>()
 
+    /** 正在后台刷新的管理器（避免同一个管理器并发扫描） */
+    private val refreshing = mutableSetOf<PackageManagerType>()
+
+    /**
+     * 后台刷新作用域：进程级。仅用于「缓存优先」模式下把刷新挪出调用方路径——
+     * 调用方拿完缓存就返回了，刷新必须继续跑完，因此不能借用调用方的作用域。
+     */
+    private val refreshScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     /** 每个管理器「检测完成后缓存文件是否存在」，用于判定「缓存被删除」这一触发条件 */
     private val cachePresentAfterDetection = mutableMapOf<PackageManagerType, Boolean>()
 
@@ -94,8 +106,12 @@ object PackageDetector {
     val isDetecting: Boolean get() = _state.value.status == DetectionStatus.SCANNING
 
     /**
-     * 进入工具页或切换包管理器时调用。
-     * 仅在本进程确实需要检测时才真正扫描，否则直接复用进程内快照（不读盘、不扫描）。
+     * 进入工具页或切换包管理器时调用，也供内置工具在需要时调用。
+     *
+     * 顺序：进程内快照 → 磁盘缓存（立即返回 + 后台静默刷新）→ 真正扫描。
+     *
+     * 第三档（真正扫描）是慢操作：Windows 上 `winget list` 通常几秒，`winget export` 实测可达 109 秒。
+     * 因此有磁盘缓存时一律先用缓存把界面点亮，刷新交给后台，绝不让调用方空等。
      */
     suspend fun detectIfNeeded(manager: PackageManagerType) {
         if (manager == PackageManagerType.UNKNOWN) return
@@ -110,7 +126,32 @@ object PackageDetector {
                 }
                 return@withLock
             }
+            if (session == null) {
+                val cached = loadInstalledPackages().scans[manager.name]
+                if (cached != null && cached.packages.isNotEmpty()) {
+                    val snapshot = InstalledSnapshot(manager, cached.scannedAt, cached.packages)
+                    sessionSnapshots[manager] = snapshot
+                    _state.value = DetectionState(manager, DetectionStatus.READY, snapshot, fromCache = true)
+                    scheduleRefresh(manager)
+                    return@withLock
+                }
+            }
             detectLocked(manager)
+        }
+    }
+
+    /**
+     * 后台静默刷新（同一管理器同时只会有一个刷新在跑）。
+     * 用进程级作用域而不是调用方作用域：调用方拿完缓存就走了，刷新必须继续跑完。
+     */
+    private fun scheduleRefresh(manager: PackageManagerType) {
+        if (!refreshing.add(manager)) return
+        refreshScope.launch {
+            try {
+                mutex.withLock { detectLocked(manager, silent = true) }
+            } finally {
+                refreshing.remove(manager)
+            }
         }
     }
 
@@ -237,7 +278,7 @@ private suspend fun scan(manager: PackageManagerType): InstalledSnapshot? = with
 }
 
 private fun failedHint(manager: PackageManagerType): String? = when (manager) {
-    PackageManagerType.WINGET -> "未能读取 Winget 已安装列表"
+    PackageManagerType.WINGET -> "未能读取 Winget 已安装列表（winget 未在超时内返回），当前显示缓存数据"
     PackageManagerType.DNF, PackageManagerType.ZYPPER -> "未能读取 RPM 数据库"
     else -> null
 }
@@ -451,13 +492,62 @@ private fun chocolateyRoot(): Path {
 }
 
 /**
- * Winget：`winget export` 输出结构化 JSON，避开 `winget list` 的固定宽度列解析。
+ * Winget：优先 `winget list --source winget`（本机实测 **3.00 秒**），失败时回退到
+ * `winget export`（结构化 JSON，但本机实测 **109 秒**）。
+ *
+ * 关键细节（都是实测踩出来的）：
+ * - **必须带 `--source winget`**：不带时 winget 会把 ARP / MSIX / msstore 全部枚举一遍，
+ *   本机要 107.89 秒，而且返回的 ID 是 `ARP\Machine\X64\...` / `MSIX\...`，
+ *   与软件目录里的 winget 包标识符对不上，装了/卸了都无从判断。
+ * - `winget --version`、`winget source list` 都是 0.5 秒内返回，所以慢的不是 CLI 本身。
+ *
+ * 即便如此，这里仍属于「慢操作」：真正的对策是缓存优先 + 不把扫描放进 AI 关键路径
+ * （见 [PackageDetector.detectIfNeeded] 与 ai/EnvironmentSummary）。
  */
 private fun scanWinget(): Map<String, InstalledPackageEntry>? {
+    // 少于 3 条基本可判定解析失败（列宽/本地化格式变化），交给 export 兜底
+    scanWingetList()?.takeIf { it.size >= 3 }?.let { return it }
+    return scanWingetExport()
+}
+
+/**
+ * `winget list --disable-interactivity --source winget`：固定宽度列，按「2 个以上空格」分列。
+ * 真实输出形如：
+ * ```
+ * 名称                  ID                            版本            可用
+ * --------------------- ----------------------------- --------------- ---------------
+ * Eclipse Temurin ...   EclipseAdoptium.Temurin.21.JRE 21.0.12.8       21.0.12.101
+ * ```
+ * 表头、提示行、列位错乱的行都会被下面的规则挡掉。
+ */
+private fun scanWingetList(): Map<String, InstalledPackageEntry>? {
+    val output = PackageDetectorCommand.run(
+        "winget list --disable-interactivity --source winget --accept-source-agreements",
+        15
+    ) ?: return null
+    val columnSplit = Regex("\\s{2,}")
+    val idPattern = Regex("^[A-Za-z0-9][A-Za-z0-9._+-]*$")
+    val result = HashMap<String, InstalledPackageEntry>()
+    for (rawLine in output.lineSequence()) {
+        val line = rawLine.trimEnd()
+        if (line.isBlank() || line.startsWith("---")) continue
+        val cols = line.split(columnSplit).map { it.trim() }.filter { it.isNotEmpty() }
+        if (cols.size < 3) continue
+        val id = cols[1]
+        if (!idPattern.matches(id) || id.equals("ID", ignoreCase = true)) continue
+        val version = cols[2]
+        if (version.none { it.isDigit() }) continue
+        result[id.lowercase()] = InstalledPackageEntry(version = version)
+    }
+    return result.ifEmpty { null }
+}
+
+/** 回退：`winget export` 的结构化 JSON（完整但很慢，故超时压到 30 秒） */
+private fun scanWingetExport(): Map<String, InstalledPackageEntry>? {
     val tmp = Path.of(System.getProperty("java.io.tmpdir"), "ntb-winget-export-${System.nanoTime()}.json")
     return try {
         val cmd = "winget export -o \"${tmp.toAbsolutePath()}\" --include-versions --accept-source-agreements"
-        if (PackageDetectorCommand.run(cmd, 90) == null) return null
+        if (PackageDetectorCommand.run(cmd, 30) == null) return null
         if (!Files.exists(tmp)) return null
         val decoded = PackageDetectorCommand.json.decodeFromString<WingetExportFile>(Files.readString(tmp))
         val result = HashMap<String, InstalledPackageEntry>()

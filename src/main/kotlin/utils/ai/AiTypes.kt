@@ -5,50 +5,43 @@
 // Based on: NNETB (©2026 HOE Team, MIT License) and NNETB-For-Linux (©2026 HOE Team, GPL-3.0 License)
 // License: GPL-3.0 (see LICENSE file for details)
 //
-// AI 数据模型（参考 OpenDroidChat 实现，去除 Android 依赖）
+// AI 配置模型：只放「会被落盘 / 会被界面编辑」的数据；会话与工具模型见 ChatModels.kt / ToolSpec.kt
 
 package utils.ai
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonElement
 
 /**
- * LLM 提供商。第一阶段只支持 OpenAI 兼容协议，可覆盖 OpenAI / DeepSeek / 百炼 及各类本地模型。
+ * LLM 提供商预设。第一阶段只支持 OpenAI 兼容协议，可覆盖 OpenAI / DeepSeek / 百炼 及各类本地模型。
+ *
+ * @param supportsThinking 该网关是否认 `thinking` 参数（不认就必须留 AUTO，否则请求可能直接报错）
  */
-enum class LlmProvider(val displayName: String, val defaultBaseUrl: String) {
+enum class LlmProvider(
+    val displayName: String,
+    val defaultBaseUrl: String,
+    val supportsThinking: Boolean = false
+) {
     OPENAI("OpenAI", "https://api.openai.com/v1"),
-    DEEPSEEK("DeepSeek", "https://api.deepseek.com/v1"),
+    DEEPSEEK("DeepSeek", "https://api.deepseek.com/v1", supportsThinking = true),
     DASHSCOPE("阿里云百炼 (OpenAI 兼容)", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
     CUSTOM("自定义 (OpenAI 兼容)", "");
 
     /** 实际使用的 Base URL：填了自定义值就优先用自定义值 */
     fun resolveBaseUrl(custom: String): String {
         val trimmed = custom.trim()
-        if (trimmed.isNotEmpty()) return trimmed
-        return defaultBaseUrl
+        return if (trimmed.isNotEmpty()) trimmed else defaultBaseUrl
     }
 
     /** 聊天补全端点 */
-    fun chatCompletionsUrl(custom: String): String {
-        return resolveBaseUrl(custom).trimEnd('/') + "/chat/completions"
-    }
-}
-
-/**
- * 系统状态透传的详细程度。
- */
-enum class SystemContextDetail(val displayName: String) {
-    OFF("不携带"),
-    COMPACT("精简"),
-    STANDARD("标准"),
-    FULL("详细")
+    fun chatCompletionsUrl(custom: String): String =
+        resolveBaseUrl(custom).trimEnd('/') + "/chat/completions"
 }
 
 /**
  * 思考模式。
- * DeepSeek 等网关若不显式传 `thinking`，模型可能默认开启思考：
- * 思考阶段只推送 reasoning_content（正文尚未开始），看上去就像「伪流式」。
- * 参考 OpenDroidChat：对 DeepSeek 始终显式传 thinking 开关（其默认值为关闭）。
+ *
+ * DeepSeek 等网关若不显式传 `thinking`，模型可能默认开启思考：思考阶段只推送
+ * reasoning_content（正文尚未开始），看上去就像「伪流式」。
  */
 enum class ThinkingMode(val displayName: String) {
     AUTO("默认（不发送该参数）"),
@@ -65,7 +58,7 @@ data class AiModelConfig(
     val name: String = "",
     val provider: LlmProvider = LlmProvider.OPENAI,
     val modelName: String = "",
-    /** 加密后的 API Key（dpapi: / keyring: / aesgcm: 前缀） */
+    /** 加密后的 API Key（dpapi: / aesgcm: 前缀） */
     val apiKeyEnc: String = "",
     val baseUrl: String = "",
     val systemPrompt: String = "",
@@ -74,13 +67,11 @@ data class AiModelConfig(
     val toolsEnabled: Boolean = true,
     /** 单独禁用的工具名 */
     val disabledTools: List<String> = emptyList(),
-    /** 写操作（安装 / 更新 / 卸载）执行前是否需要用户确认 */
+    /** 写操作（安装 / 更新 / 卸载 / 执行命令）执行前是否需要用户确认 */
     val confirmWriteOps: Boolean = true,
-    /** 系统状态透传级别 */
-    val systemContext: SystemContextDetail = SystemContextDetail.STANDARD,
     /** 工具调用循环的最大轮数 */
     val maxToolIterations: Int = 6,
-    /** 思考模式（目前仅对 DeepSeek 生效） */
+    /** 思考模式 */
     val thinkingMode: ThinkingMode = ThinkingMode.DISABLED
 )
 
@@ -98,65 +89,18 @@ data class AiAppConfig(
         models.firstOrNull { it.id == activeModelId }?.let { return it }
         return models.firstOrNull()
     }
-}
 
-/** 聊天消息发送方 */
-enum class ChatRole { USER, ASSISTANT }
+    /** 用更新后的模型替换旧值（按 id） */
+    fun withModel(updated: AiModelConfig): AiAppConfig =
+        copy(models = models.map { if (it.id == updated.id) updated else it })
 
-/**
- * 一次工具调用（由模型输出解析而来）。
- */
-data class ToolCall(
-    val tool: String,
-    val arguments: Map<String, JsonElement> = emptyMap()
-) {
-    /** 供界面展示的简要说明 */
-    fun summary(): String {
-        if (arguments.isEmpty()) return tool
-        val parts = arguments.entries.map { entry -> entry.key + "=" + shortenArg(entry.value.toString()) }
-        return tool + "(" + parts.joinToString(", ") + ")"
+    /** 删除模型，并保证 activeModelId 始终指向存在的模型 */
+    fun withoutModel(id: String): AiAppConfig {
+        val rest = models.filterNot { it.id == id }
+        val nextActive = activeModelId?.takeIf { it != id } ?: rest.firstOrNull()?.id
+        return copy(models = rest, activeModelId = nextActive)
     }
 
-    private fun shortenArg(raw: String): String {
-        val text = raw.trim('"')
-        if (text.length <= 60) return text
-        return text.take(60) + "..."
-    }
+    fun addModel(model: AiModelConfig): AiAppConfig =
+        copy(models = models + model, activeModelId = activeModelId ?: model.id)
 }
-
-/** 工具执行结果 */
-data class ToolResult(
-    val text: String,
-    val isError: Boolean = false
-)
-
-/**
- * 助手消息中的分段：思考块 / 工具调用块。
- *
- * 分段列表就是一条**线性时间线**：列表顺序 = 界面展示顺序，
- * 因此调用方只能按发生顺序**追加**分段（不能插队），界面按列表顺序自上而下渲染。
- *
- * 一段思考 = 一次连续的推理输出：正文开始输出或开始调用工具即结束该段，
- * 之后的推理增量会新起一段（否则多轮思考会粘成一块，时间线就错位了）。
- */
-sealed class ChatSegment {
-    /** 一段思考；[streaming] 为 true 表示这段还在增长（界面显示「思考中」并自动展开） */
-    data class Thinking(val text: String, val streaming: Boolean = false) : ChatSegment()
-
-    data class ToolCallSegment(
-        val call: ToolCall,
-        val result: ToolResult? = null,
-        val durationMs: Long = 0L,
-        val pending: Boolean = false
-    ) : ChatSegment()
-}
-
-/** 界面上的一条消息 */
-data class ChatMessage(
-    val id: Long = System.nanoTime(),
-    val role: ChatRole,
-    val text: String = "",
-    val segments: List<ChatSegment> = emptyList(),
-    val streaming: Boolean = false,
-    val error: String? = null
-)

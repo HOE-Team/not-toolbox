@@ -27,6 +27,7 @@ import ntb.generated.resources.Res
 import ntb.generated.resources.logo
 import org.jetbrains.compose.resources.painterResource
 import screens.*
+import screens.ai.AiScreen
 import theme.AppTheme
 import utils.*
 import java.awt.Dimension
