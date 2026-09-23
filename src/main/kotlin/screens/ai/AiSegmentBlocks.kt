@@ -75,10 +75,15 @@ internal fun AiThinkingBlock(text: String, autoExpand: Boolean) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.weight(1f))
-                Text(
-                    text = if (expanded) "收起" else "展开",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = accent
+                Icon(
+                    imageVector = if (expanded) {
+                        MaterialSymbols.KeyboardArrowDown
+                    } else {
+                        MaterialSymbols.KeyboardArrowRight
+                    },
+                    contentDescription = if (expanded) "收起" else "展开",
+                    modifier = Modifier.size(18.dp),
+                    tint = accent
                 )
             }
             if (expanded && text.isNotBlank()) {
@@ -104,7 +109,8 @@ internal fun AiThinkingBlock(text: String, autoExpand: Boolean) {
 internal fun AiToolCallBlock(
     segment: ChatSegment.ToolCallSegment,
     showResult: Boolean,
-    onNavigateToTerminal: () -> Unit
+    onNavigateToTerminal: () -> Unit,
+    onContinue: () -> Unit
 ) {
     val spec = ToolDispatcher.specOf(segment.call.tool)
     val isWrite = spec != null && spec.danger != ToolDanger.READ
@@ -190,10 +196,15 @@ internal fun AiToolCallBlock(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (collapsed) "展开" else "收起",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary
+                Icon(
+                    imageVector = if (collapsed) {
+                        MaterialSymbols.KeyboardArrowRight
+                    } else {
+                        MaterialSymbols.KeyboardArrowDown
+                    },
+                    contentDescription = if (collapsed) "展开" else "收起",
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.primary
                 )
             }
 
@@ -219,6 +230,33 @@ internal fun AiToolCallBlock(
                         fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+
+                // 长任务（安装 / 命令）的实时输出尾部：运行中持续刷新，只展示最新一段
+                if (segment.phase.isPending && segment.outputTail.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = segment.outputTail.takeLast(OUTPUT_PREVIEW_CHARS),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(8.dp)
+                        )
+                    }
+                }
+
+                // 左下角：用户可选择不再等待（工具会如实回报「未完成」，进程继续在终端运行）
+                if (segment.phase == ToolPhase.RUNNING && spec != null && spec.canContinue) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    // Material 3 的 Filled 按钮即默认 Button（主色填充容器）
+                    Button(onClick = onContinue) {
+                        Text("在执行时继续")
+                    }
                 }
 
                 val result = segment.result
@@ -260,3 +298,6 @@ internal fun AiToolCallBlock(
 /** 耗时显示：不足 1 秒用 ms，否则保留一位小数的秒 */
 private fun formatDuration(ms: Long): String =
     if (ms < 1000) ms.toString() + "ms" else String.format(Locale.US, "%.1fs", ms / 1000.0)
+
+/** 卡片内实时输出的展示上限（只显示最新一段，避免卡片被刷屏） */
+private const val OUTPUT_PREVIEW_CHARS = 800

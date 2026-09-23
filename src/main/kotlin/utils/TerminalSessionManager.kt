@@ -58,6 +58,18 @@ object TerminalSessionManager {
     private const val DEFAULT_SESSION_ID = 0L
     private const val DEFAULT_SESSION_TITLE = "默认"
 
+    /** awaitCommandOutcome：输出尾部保留的字符数 */
+    private const val OUTPUT_TAIL_LIMIT = 2000
+
+    /** awaitCommandOutcome：等待命令进入运行态的上限（起不来就立即返回，避免空等） */
+    private const val START_WAIT_MS = 5_000L
+
+    /** awaitCommandOutcome：总等待上限，防止界面永久挂起 */
+    private const val MAX_WAIT_MS = 30 * 60 * 1000L
+
+    /** awaitCommandOutcome：等待轮询间隔（同时用于推送输出尾部） */
+    private const val WAIT_POLL_MS = 150L
+
     /** 全部会话（Compose 状态列表，用于标签页 UI） */
     private val _sessions = mutableStateListOf<TerminalSession>()
     val sessions: List<TerminalSession> get() = _sessions
@@ -432,7 +444,6 @@ object TerminalSessionManager {
         val s = getSession(sessionId) ?: return
         // 使全局别名指向该会话（便于安装对话框 / 导航到终端时显示）
         setActiveSession(sessionId)
-
         // 取消该会话之前的执行任务
         s.commandJob?.cancel()
 
@@ -508,6 +519,69 @@ object TerminalSessionManager {
         }
     }
     
+    /**
+     * 一次命令「等待到底」的结果。
+     */
+    data class CommandOutcome(
+        val sessionId: Long,
+        /** true = 命令已结束；false = 用户要求「继续」而提前返回，进程仍在后台运行 */
+        val finished: Boolean,
+        val exitCode: Int?,
+        val cancelled: Boolean,
+        /** 输出尾部（回填给模型 / 卡片展示） */
+        val outputTail: String
+    )
+
+    /**
+     * 等待指定会话的命令真正结束。
+     *
+     * [executeCommandAndWait] 只是把命令**投递**出去就返回了，想知道真实结果（退出码 / 输出 /
+     * 是否被中断）必须在这里等 `isRunning` 的 true→false 边沿。等待期间会回调输出尾部
+     * （[onProgress]），并轮询 [continueRequested]：用户点「在执行时继续」时立即返回
+     * `finished = false`，**不杀进程**（安装继续在终端里跑）。
+     */
+    suspend fun awaitCommandOutcome(
+        sessionId: Long,
+        onProgress: ((String) -> Unit)? = null,
+        continueRequested: (() -> Boolean)? = null
+    ): CommandOutcome {
+        val s = getSession(sessionId)
+            ?: return CommandOutcome(sessionId, finished = true, exitCode = null, cancelled = false, outputTail = "")
+        // 先等它真正进入运行态；起不来（启动失败 / 瞬间结束）就直接返回现状，不空等
+        withTimeoutOrNull(START_WAIT_MS) { s.isRunning.first { it } }
+        if (!s.isRunning.value) {
+            val tail = outputTailOf(s.output.value)
+            onProgress?.invoke(tail)
+            return CommandOutcome(sessionId, true, s.lastExitCode.value, s.wasCancelled.value, tail)
+        }
+        val startedAt = System.currentTimeMillis()
+        val finished = coroutineScope {
+            var done = false
+            val watcher = launch { s.isRunning.first { !it }; done = true }
+            try {
+                while (!done) {
+                    onProgress?.invoke(outputTailOf(s.output.value))
+                    if (continueRequested?.invoke() == true) break
+                    if (System.currentTimeMillis() - startedAt > MAX_WAIT_MS) break
+                    delay(WAIT_POLL_MS)
+                }
+            } finally {
+                watcher.cancel()
+            }
+            done
+        }
+        val tail = outputTailOf(s.output.value)
+        onProgress?.invoke(tail)
+        return CommandOutcome(sessionId, finished, s.lastExitCode.value, s.wasCancelled.value, tail)
+    }
+
+    /** 取输出尾部；过长时保留末尾并标注已截断 */
+    private fun outputTailOf(text: String): String {
+        val trimmed = text.trimEnd()
+        if (trimmed.length <= OUTPUT_TAIL_LIMIT) return trimmed
+        return "…（输出已截断）\n" + trimmed.substring(trimmed.length - OUTPUT_TAIL_LIMIT)
+    }
+
     /**
      * 停止指定会话的进程
      * 使用 taskkill（Windows）或 kill（Linux）直接终止进程

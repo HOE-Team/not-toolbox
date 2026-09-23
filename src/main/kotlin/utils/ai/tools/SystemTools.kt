@@ -60,12 +60,13 @@ object SystemTools {
                 name = "run_offline_item",
                 description = "执行「本地」页面保存的某个条目（按 id）。会修改系统，执行前需用户确认。",
                 runningHint = "执行本地条目",
+                canContinue = true,
                 params = listOf(
                     ToolParamSpec("id", "string", "条目 id（先用 list_offline_items 获取）", required = true)
                 ),
                 danger = ToolDanger.WRITE
             ),
-            handler = { call, _ -> runOfflineItem(call) }
+            handler = { call, env -> runOfflineItem(call, env) }
         )
     )
 
@@ -138,18 +139,38 @@ object SystemTools {
         return ToolResult(sb.toString().trim())
     }
 
-    private fun runOfflineItem(call: ToolCall): ToolResult {
+    /** 执行本地条目并等它真正结束（同 changePackage：`executeCommandAndWait` 只是投递） */
+    private suspend fun runOfflineItem(call: ToolCall, env: ToolEnv): ToolResult {
         val id = call.stringArg("id")
         if (id.isNullOrBlank()) return ToolResult("缺少参数 id。", isError = true)
         val item = loadOfflineItems().firstOrNull { it.id == id }
             ?: return ToolResult("未找到 id 为 " + id + " 的本地条目。", isError = true)
-        if (item.type == MOfflineEntryType.PATH) {
+        val sessionId = if (item.type == MOfflineEntryType.PATH) {
             val workingDir = File(item.value).parent ?: ""
             TerminalSessionManager.executeCommandAndWait("\"" + item.value + "\"", workingDir)
         } else {
             TerminalSessionManager.executeCommandAndWait(item.value)
         }
-        return ToolResult("已执行本地条目：" + item.value + "\n请在终端查看执行结果。")
+        val outcome = TerminalSessionManager.awaitCommandOutcome(
+            sessionId = sessionId,
+            onProgress = { tail -> env.onProgress?.invoke(tail) },
+            continueRequested = { env.continueRequested?.invoke() == true }
+        )
+        val tailNote = if (outcome.outputTail.isBlank()) "" else "\n输出尾部：\n" + outcome.outputTail
+        return when {
+            !outcome.finished -> ToolResult(
+                "【未完成】本地条目仍在终端运行（用户选择继续），退出码未知。请勿报告成功。" + tailNote
+            )
+
+            outcome.cancelled -> ToolResult("本地条目已被用户中断。" + tailNote, isError = true)
+
+            outcome.exitCode == 0 -> ToolResult("本地条目执行完成（退出码 0）。" + tailNote)
+
+            else -> ToolResult(
+                "本地条目执行失败（退出码 " + (outcome.exitCode ?: "未知") + "）。" + tailNote,
+                isError = true
+            )
+        }
     }
 
     private fun fmt(value: Double): String = String.format(Locale.US, "%.1f", value)

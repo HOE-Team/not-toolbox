@@ -4,6 +4,8 @@ import icons.robot_2
 import icons.brightness_empty
 import main.kotlin.icons.*
 import androidx.compose.ui.graphics.vector.ImageVector
+import icons.keyboard_arrow_down
+import icons.keyboard_arrow_right
 import icons.neurology
 
 /**
@@ -207,4 +209,10 @@ object MaterialSymbols {
 
     /**Neurology**/
     val Neurology: ImageVector = neurology
+
+    /**KeyboardArrowDown**/
+    val KeyboardArrowDown: ImageVector = keyboard_arrow_down
+
+    /**KeyboardArrowRight**/
+    val KeyboardArrowRight: ImageVector = keyboard_arrow_right
 }

@@ -43,7 +43,8 @@ internal fun AiMessageList(
     listState: LazyListState,
     showReasoning: Boolean,
     showToolResults: Boolean,
-    onNavigateToTerminal: () -> Unit
+    onNavigateToTerminal: () -> Unit,
+    onContinue: () -> Unit
 ) {
     LazyColumn(
         state = listState,
@@ -56,7 +57,8 @@ internal fun AiMessageList(
                 message = message,
                 showReasoning = showReasoning,
                 showToolResults = showToolResults,
-                onNavigateToTerminal = onNavigateToTerminal
+                onNavigateToTerminal = onNavigateToTerminal,
+                onContinue = onContinue
             )
         }
     }
@@ -67,7 +69,8 @@ private fun AiMessageBubble(
     message: ChatMessage,
     showReasoning: Boolean,
     showToolResults: Boolean,
-    onNavigateToTerminal: () -> Unit
+    onNavigateToTerminal: () -> Unit,
+    onContinue: () -> Unit
 ) {
     val isUser = message.role == ChatRole.USER
     Column(
@@ -90,7 +93,8 @@ private fun AiMessageBubble(
                 message = message,
                 showReasoning = showReasoning,
                 showToolResults = showToolResults,
-                onNavigateToTerminal = onNavigateToTerminal
+                onNavigateToTerminal = onNavigateToTerminal,
+                onContinue = onContinue
             )
         }
     }
@@ -122,7 +126,8 @@ private fun AiTimeline(
     message: ChatMessage,
     showReasoning: Boolean,
     showToolResults: Boolean,
-    onNavigateToTerminal: () -> Unit
+    onNavigateToTerminal: () -> Unit,
+    onContinue: () -> Unit
 ) {
     val nodes = message.segments.filter { segment ->
         when (segment) {
@@ -152,7 +157,8 @@ private fun AiTimeline(
                     is ChatSegment.ToolCallSegment -> AiToolCallBlock(
                         segment = segment,
                         showResult = showToolResults,
-                        onNavigateToTerminal = onNavigateToTerminal
+                        onNavigateToTerminal = onNavigateToTerminal,
+                        onContinue = onContinue
                     )
                 }
             }

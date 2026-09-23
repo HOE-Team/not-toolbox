@@ -129,7 +129,8 @@ fun AiScreen(
                         listState = listState,
                         showReasoning = state.showReasoning,
                         showToolResults = state.showToolResults,
-                        onNavigateToTerminal = onNavigateToTerminal
+                        onNavigateToTerminal = onNavigateToTerminal,
+                        onContinue = { state.continueRunningTool() }
                     )
                 }
             }

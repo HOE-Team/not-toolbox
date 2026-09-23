@@ -40,6 +40,12 @@ data class ToolSpec(
 
     /** 首次执行可能明显较慢（需要扫描本机软件包等），卡片会额外提示 */
     val slowFirstRun: Boolean = false,
+
+    /**
+     * 该工具是否会长时间占用终端命令。为 true 时，运行中卡片会提供
+     * 「在执行时继续」按钮（让 AI 不必死等，继续往下走）。
+     */
+    val canContinue: Boolean = false,
     val params: List<ToolParamSpec> = emptyList(),
     val danger: ToolDanger = ToolDanger.READ
 )
@@ -54,13 +60,17 @@ data class ToolDef(
  * 工具执行环境：告诉工具「当前应用处于什么状态」。
  *
  * @param confirm 写操作确认回调；返回 false 表示用户拒绝。为 null 时直接执行（不经过界面）。
+ * @param onProgress 长任务的输出/进度回调（在 IO 线程调用），会话据此实时更新卡片
+ * @param continueRequested 用户是否点了「在执行时继续」；工具据此放弃等待并如实回报「未完成」
  */
 data class ToolEnv(
     val manager: PackageManagerType,
     val useProxy: Boolean = false,
     val proxyUrl: String = "",
     val isDebug: Boolean = true,
-    val confirm: (suspend (ToolCall) -> Boolean)? = null
+    val confirm: (suspend (ToolCall) -> Boolean)? = null,
+    val onProgress: ((String) -> Unit)? = null,
+    val continueRequested: (() -> Boolean)? = null
 )
 
 /** 生成给模型看的工具说明（追加到系统提示之后） */

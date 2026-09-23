@@ -10,8 +10,10 @@
 package utils.ai.tools
 
 import utils.TerminalSessionManager
+import utils.ai.ToolCall
 import utils.ai.ToolDanger
 import utils.ai.ToolDef
+import utils.ai.ToolEnv
 import utils.ai.ToolParamSpec
 import utils.ai.ToolResult
 import utils.ai.ToolSpec
@@ -24,19 +26,35 @@ object ShellTools {
                 name = "run_command",
                 description = "在终端执行任意 Shell 命令。仅在用户于设置中显式开启后可用，执行前需用户确认。",
                 runningHint = "执行终端命令",
+                canContinue = true,
                 params = listOf(
                     ToolParamSpec("command", "string", "要执行的完整命令", required = true)
                 ),
                 danger = ToolDanger.SHELL
             ),
-            handler = { call, _ -> runCommand(call) }
+            handler = { call, env -> runCommand(call, env) }
         )
     )
 
-    private fun runCommand(call: utils.ai.ToolCall): ToolResult {
+    /**
+     * 执行命令并等它真正结束（`executeCommandAndWait` 只是投递，见其实现注释），
+     * 把退出码与输出尾部如实回报给模型；用户点「在执行时继续」时回报「未完成」。
+     */
+    private suspend fun runCommand(call: ToolCall, env: ToolEnv): ToolResult {
         val command = call.stringArg("command")
         if (command.isNullOrBlank()) return ToolResult("缺少参数 command。", isError = true)
-        TerminalSessionManager.executeCommandAndWait(command)
-        return ToolResult("已在终端执行命令：" + command + "\n请在终端查看输出。")
+        val sessionId = TerminalSessionManager.executeCommandAndWait(command)
+        val outcome = TerminalSessionManager.awaitCommandOutcome(
+            sessionId = sessionId,
+            onProgress = { tail -> env.onProgress?.invoke(tail) },
+            continueRequested = { env.continueRequested?.invoke() == true }
+        )
+        val tailNote = if (outcome.outputTail.isBlank()) "" else "\n输出尾部：\n" + outcome.outputTail
+        return when {
+            !outcome.finished -> ToolResult("【未完成】命令仍在终端运行（用户选择继续），退出码未知。请勿报告成功。" + tailNote)
+            outcome.cancelled -> ToolResult("命令已被用户中断。" + tailNote, isError = true)
+            outcome.exitCode == 0 -> ToolResult("命令完成（退出码 0）。" + tailNote)
+            else -> ToolResult("命令失败（退出码 " + (outcome.exitCode ?: "未知") + "）。" + tailNote, isError = true)
+        }
     }
 }

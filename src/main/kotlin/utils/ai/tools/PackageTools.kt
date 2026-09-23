@@ -92,6 +92,7 @@ object PackageTools {
                 name = "install_package",
                 description = "通过系统包管理器安装指定软件包。会修改系统，执行前需用户确认。",
                 runningHint = "安装软件包",
+                canContinue = true,
                 params = listOf(
                     ToolParamSpec("name", "string", "原生包名（可通过 list_packages 获取）", required = true)
                 ),
@@ -104,6 +105,7 @@ object PackageTools {
                 name = "update_package",
                 description = "升级指定的已安装软件包。会修改系统，执行前需用户确认。",
                 runningHint = "升级软件包",
+                canContinue = true,
                 params = listOf(
                     ToolParamSpec("name", "string", "原生包名", required = true)
                 ),
@@ -116,6 +118,7 @@ object PackageTools {
                 name = "uninstall_package",
                 description = "卸载指定的已安装软件包。会修改系统，执行前需用户确认。",
                 runningHint = "卸载软件包",
+                canContinue = true,
                 params = listOf(
                     ToolParamSpec("name", "string", "原生包名", required = true)
                 ),
@@ -273,7 +276,14 @@ object PackageTools {
 
     // ---------- 写操作（在此之前已由 ToolDispatcher 征得用户同意） ----------
 
-    private fun changePackage(call: ToolCall, env: ToolEnv, action: String): ToolResult {
+    /**
+     * 安装 / 升级 / 卸载。
+     *
+     * 关键：`executeCommandAndWait` 只是把命令**投递**到终端就返回，必须再用
+     * [TerminalSessionManager.awaitCommandOutcome] 等它真正结束，否则会立刻回给模型
+     * 「已执行」，模型据此误判成功——这正是"点了允许就报告安装完毕"的根因。
+     */
+    private suspend fun changePackage(call: ToolCall, env: ToolEnv, action: String): ToolResult {
         if (env.manager == PackageManagerType.UNKNOWN) {
             return ToolResult("未能识别当前系统的包管理器。", isError = true)
         }
@@ -286,13 +296,30 @@ object PackageTools {
         } ?: return ToolResult("当前包管理器不支持该操作。", isError = true)
         val verb = when (action) {
             "install" -> "安装"
-            "update" -> "更新"
+            "update" -> "升级"
             else -> "卸载"
         }
-        TerminalSessionManager.executeCommandAndWait(command)
-        return ToolResult(
-            "已在终端执行" + verb + "命令：" + command +
-                "\n请提示用户在终端查看执行结果；稍后可调用 get_package_detail 复核状态。"
+        val sessionId = TerminalSessionManager.executeCommandAndWait(command)
+        val outcome = TerminalSessionManager.awaitCommandOutcome(
+            sessionId = sessionId,
+            onProgress = { tail -> env.onProgress?.invoke(tail) },
+            continueRequested = { env.continueRequested?.invoke() == true }
         )
+        val tailNote = if (outcome.outputTail.isBlank()) "" else "\n输出尾部：\n" + outcome.outputTail
+        return when {
+            !outcome.finished -> ToolResult(
+                "【未完成】" + verb + "命令仍在终端运行（用户选择继续），退出码未知。" +
+                    "请勿报告已" + verb + "成功；稍后可调用 get_package_detail 复核。" + tailNote
+            )
+
+            outcome.cancelled -> ToolResult(verb + "已被用户中断。" + tailNote, isError = true)
+
+            outcome.exitCode == 0 -> ToolResult(verb + "完成（退出码 0）。" + tailNote)
+
+            else -> ToolResult(
+                verb + "失败（退出码 " + (outcome.exitCode ?: "未知") + "）。" + tailNote,
+                isError = true
+            )
+        }
     }
 }

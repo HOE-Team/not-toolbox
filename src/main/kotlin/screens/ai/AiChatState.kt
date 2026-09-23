@@ -149,6 +149,15 @@ class AiChatState(private val scope: CoroutineScope) {
         stopTimer()
     }
 
+    /**
+     * 让正在执行的工具「在执行时继续」：不再等待它跑完，
+     * 由工具把「未完成」如实回报给模型（终端里的进程继续运行）。
+     */
+    fun continueRunningTool() {
+        session?.requestContinue()
+        notice = "已请求继续（任务仍在后台运行）"
+    }
+
     /** 写操作确认框的结果 */
     fun resolveConfirm(allow: Boolean) {
         pendingConfirm = null

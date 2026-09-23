@@ -78,6 +78,17 @@ class ChatSession(
     /** 本轮「参数还在生成」的那张卡片（标记一写出就建，JSON 闭口后并入 [announcedIds]） */
     private var openCardId: Long? = null
 
+    /** 用户是否请求「在执行时继续」（针对当前正在执行的那个工具） */
+    private var continueRequested = false
+
+    /**
+     * 界面调用：对当前正在执行的工具请求「在执行时继续」。
+     * 工具会在下一次轮询时放弃等待，并把「未完成」如实回报给模型（进程继续在终端运行）。
+     */
+    fun requestContinue() {
+        continueRequested = true
+    }
+
     /** 是否已具备调用条件（模型名 + API Key） */
     val isConfigured: Boolean get() = model.modelName.isNotBlank() && apiKey.isNotBlank()
 
@@ -159,6 +170,7 @@ class ChatSession(
             segments.clear()
             announcedIds.clear()
             openCardId = null
+            continueRequested = false
             if (!isConfigured) {
                 emit(ChatEvent.Failed(if (apiKey.isBlank()) MSG_NO_KEY else MSG_NO_MODEL))
                 emit(ChatEvent.Finished(null))
@@ -253,18 +265,28 @@ class ChatSession(
                     // 批准后再转「执行中」，被拒绝则「已拒绝」——不再一律显示成「执行中」
                     val originalConfirm = toolEnv.confirm
                     val spec = ToolDispatcher.specOf(call.tool)
-                    val callEnv = if (spec != null && spec.danger != ToolDanger.READ && originalConfirm != null) {
-                        toolEnv.copy(confirm = { pending ->
-                            setPhase(id, ToolPhase.AWAITING_CONFIRM)
-                            publish(emit, coalesce = false)
-                            val allowed = originalConfirm(pending)
-                            setPhase(id, if (allowed) ToolPhase.RUNNING else ToolPhase.REJECTED)
-                            publish(emit, coalesce = false)
-                            allowed
-                        })
-                    } else {
-                        toolEnv
-                    }
+                    val needsConfirm = spec != null && spec.danger != ToolDanger.READ && originalConfirm != null
+                    continueRequested = false
+                    val callEnv = toolEnv.copy(
+                        confirm = if (needsConfirm) {
+                            { pending ->
+                                setPhase(id, ToolPhase.AWAITING_CONFIRM)
+                                publish(emit, coalesce = false)
+                                val allowed = originalConfirm.invoke(pending)
+                                setPhase(id, if (allowed) ToolPhase.RUNNING else ToolPhase.REJECTED)
+                                publish(emit, coalesce = false)
+                                allowed
+                            }
+                        } else {
+                            originalConfirm
+                        },
+                        // 长任务（安装 / 命令）把输出尾部实时刷到卡片上
+                        onProgress = { tail ->
+                            replaceSegment(id) { it.copy(outputTail = tail) }
+                            publish(emit, coalesce = true)
+                        },
+                        continueRequested = { continueRequested }
+                    )
                     val toolResult = ToolDispatcher.invoke(call, specs, callEnv)
                     fillToolResult(id, toolResult, System.currentTimeMillis() - started)
                     publish(emit, coalesce = false)

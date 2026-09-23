@@ -119,7 +119,9 @@ sealed class ChatSegment {
         val phase: ToolPhase = ToolPhase.AWAITING_ARGS,
         val startedAtMs: Long = 0L,
         val result: ToolResult? = null,
-        val durationMs: Long = 0L
+        val durationMs: Long = 0L,
+        /** 长任务的实时输出尾部（运行中展示，例如安装进度） */
+        val outputTail: String = ""
     ) : ChatSegment() {
         val pending: Boolean get() = phase.isPending
     }
