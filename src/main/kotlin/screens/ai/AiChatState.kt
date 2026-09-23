@@ -48,10 +48,14 @@ data class AiChatDeps(
 /**
  * AI 会话页的状态持有者。
  *
- * 以前这些状态与派生值散在 1800 行的 Composable 里（十几个 `mutableStateOf` + 每 200ms 的计时器 +
- * 三个手算的派生统计 + agent/job/deferred 交错），现在集中在这里，界面只读状态、只调用方法。
+ * 由 MainApp 持有（应用级作用域），页面只读状态、只调用方法；切页不再丢对话，生成中切页也不会被取消。
  *
- * 对话历史保存在进程内的 [ChatSession] 中（不落盘，重启即清空）；API Key 仅以密文存于配置文件。
+ * **对话只存在于内存中：绝不落盘。** 不写任何对话日志/缓存文件，进程退出即清空；
+ * 只有模型配置（`config/ai_config.json`）与加密后的 API Key 会落盘。
+ * 后续如需"恢复上次对话"，应先与产品/隐私要求确认，不要顺手加文件写入。
+ *
+ * 以前这些状态与派生值散在 1800 行的 Composable 里（十几个 `mutableStateOf` + 每 200ms 的计时器 +
+ * 三个手算的派生统计 + agent/job/deferred 交错），现在集中在这里。
  */
 class AiChatState(private val scope: CoroutineScope) {
 

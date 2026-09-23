@@ -28,22 +28,35 @@ import java.util.Locale
 /**
  * AI 助手页。
  *
- * - 状态与对话编排在 [AiChatState]，渲染在同包的各个 Composable 里
+ * - 状态与对话编排在 [AiChatState]：由 MainApp 持有（应用级），**本页不创建**，
+ *   因此切到其它页面再回来对话仍在，生成中的请求也不会被取消
  * - 模型配置写入 config/ai_config.json（API Key 仅以密文落盘）
  * - 写操作类工具执行前弹出确认框
  */
 @Composable
 fun AiScreen(
+    state: AiChatState,
     selectedPackageManager: PackageManagerType,
     useProxy: Boolean,
     proxyUrl: String,
     isDebug: Boolean,
     onNavigateToTerminal: () -> Unit = {}
 ) {
-    val scope = rememberCoroutineScope()
-    val state = remember { AiChatState(scope) }
     val listState = rememberLazyListState()
     var showModelDialog by remember { mutableStateOf(false) }
+
+    // 每次进入本页（含从其它页切回来）都落在最新一条：会话状态是应用级的，
+    // 但 LazyColumn 的滚动位置随页面重建，不补这一步会从最开头显示
+    LaunchedEffect(Unit) {
+        val lastIndex = state.messages.lastIndex
+        if (lastIndex >= 0) {
+            try {
+                listState.scrollToItem(lastIndex, scrollOffset = Int.MAX_VALUE)
+            } catch (_: Exception) {
+                // 布局竞态，忽略
+            }
+        }
+    }
 
     /** 实际生效的包管理器（未显式选择时自动检测；首次会探测一次，之后命中进程级缓存） */
     val deps = remember(selectedPackageManager, useProxy, proxyUrl, isDebug) {

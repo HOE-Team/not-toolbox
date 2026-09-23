@@ -27,6 +27,7 @@ import ntb.generated.resources.Res
 import ntb.generated.resources.logo
 import org.jetbrains.compose.resources.painterResource
 import screens.*
+import screens.ai.AiChatState
 import screens.ai.AiScreen
 import theme.AppTheme
 import utils.*
@@ -122,6 +123,12 @@ fun main() = application {
 
         // 用于触发「重新检测已安装」等挂起操作
         val appScope = rememberCoroutineScope()
+
+        // AI 会话状态挂在应用级作用域上，而不是挂在 AI 页面里：
+        // - 切到其它页面再回来不再丢对话（此前状态由页面持有，一离开组合就被销毁）
+        // - 生成过程中切页也不会把协程一起取消
+        // 注意：对话只存在于内存中，**绝不落盘**（见 AiChatState 的类注释）。
+        val aiChatState = remember { AiChatState(appScope) }
 
         // 初始化 TerminalSessionManager 的编码
         TerminalSessionManager.setEncoding(terminalEncoding)
@@ -317,6 +324,7 @@ fun main() = application {
                         }
                     )
                     4 -> AiScreen(
+                        state = aiChatState,
                         selectedPackageManager = selectedPackageManager,
                         useProxy = useProxy,
                         proxyUrl = proxyUrl,
