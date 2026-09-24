@@ -72,8 +72,6 @@ class AiChatState(private val scope: CoroutineScope) {
     var errorText by mutableStateOf<String?>(null)
     var elapsedMs by mutableStateOf(0L)
         private set
-    var showReasoning by mutableStateOf(true)
-    var showToolResults by mutableStateOf(true)
     var pendingConfirm by mutableStateOf<ToolCall?>(null)
         private set
 
@@ -103,6 +101,12 @@ class AiChatState(private val scope: CoroutineScope) {
 
     val activeModel: AiModelConfig? get() = config.activeModel()
 
+    /** 当前是否启用思考（默认开启，由输入区开关统一管理） */
+    val thinkingEnabled: Boolean get() = activeModel?.thinkingEnabled == true
+
+    /** 该模型的提供商是否支持 thinking 参数（不支持时开关无意义，界面据此隐藏） */
+    val thinkingSupported: Boolean get() = activeModel?.provider?.supportsThinking == true
+
     /** 生成过程中已接收的正文长度 */
     val receivedChars: Int get() = if (busy) messages.lastOrNull()?.text?.length ?: 0 else 0
 
@@ -118,11 +122,24 @@ class AiChatState(private val scope: CoroutineScope) {
 
     private fun nextId(): Long = idSeq++
 
-    /** 保存配置：模型 / 密钥 / 提示词 / 工具集都可能变了，旧会话随之作废 */
-    fun persist(newConfig: AiAppConfig) {
+    /**
+     * 保存配置。
+     *
+     * @param keepSession true 时保留当前会话（如只切换了思考模式：它只影响之后的请求，
+     *   不该把对话历史一起丢掉）；默认丢弃，因为模型 / 密钥 / 提示词 / 工具集改动都会让旧会话失效。
+     */
+    fun persist(newConfig: AiAppConfig, keepSession: Boolean = false) {
         config = newConfig
         saveAiConfig(newConfig)
-        session = null
+        if (!keepSession) session = null
+    }
+
+    /** 切换「启用思考」：写入模型配置并即时生效，**不重建会话**（历史与上下文保留） */
+    fun setThinkingEnabled(enabled: Boolean) {
+        val model = activeModel ?: return
+        if (model.thinkingEnabled == enabled) return
+        session?.setThinkingEnabled(enabled)
+        persist(config.withModel(model.copy(thinkingEnabled = enabled)), keepSession = true)
     }
 
     fun startNewConversation() {

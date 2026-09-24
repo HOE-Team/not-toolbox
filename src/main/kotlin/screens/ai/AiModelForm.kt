@@ -26,7 +26,6 @@ import kotlinx.coroutines.withContext
 import utils.ai.AiModelConfig
 import utils.ai.LlmProvider
 import utils.ai.SecretStore
-import utils.ai.ThinkingMode
 import utils.ai.ToolDanger
 import utils.ai.ToolDispatcher
 
@@ -74,7 +73,6 @@ internal fun AiModelForm(
     var keyInput by remember(model.id) { mutableStateOf("") }
     var keyBusy by remember(model.id) { mutableStateOf(false) }
     var providerExpanded by remember { mutableStateOf(false) }
-    var thinkingExpanded by remember { mutableStateOf(false) }
     val hasKey = draft.apiKeyEnc.isNotBlank()
     val dirty = draft != model
 
@@ -248,45 +246,6 @@ internal fun AiModelForm(
             subtitle = "安装 / 更新 / 卸载 / 执行命令前弹窗征求同意（建议保持开启）",
             checked = draft.confirmWriteOps,
             onCheckedChange = { draft = draft.copy(confirmWriteOps = it) }
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        ExposedDropdownMenuBox(expanded = thinkingExpanded, onExpandedChange = { thinkingExpanded = it }) {
-            OutlinedTextField(
-                value = draft.thinkingMode.displayName,
-                onValueChange = {},
-                readOnly = true,
-                label = { Text("思考模式") },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = thinkingExpanded) },
-                colors = ExposedDropdownMenuDefaults.textFieldColors(),
-                modifier = Modifier
-                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = true)
-                    .fillMaxWidth()
-            )
-            ExposedDropdownMenu(expanded = thinkingExpanded, onDismissRequest = { thinkingExpanded = false }) {
-                ThinkingMode.entries.forEach { mode ->
-                    DropdownMenuItem(
-                        text = { Text(mode.displayName) },
-                        onClick = {
-                            thinkingExpanded = false
-                            draft = draft.copy(thinkingMode = mode)
-                        }
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        Text(
-            text = if (draft.provider.supportsThinking) {
-                "该提供商会收到 thinking 参数；若网关不支持该参数并报错，请改为「默认」。"
-            } else {
-                "当前提供商的请求不会携带 thinking 参数（保持「默认」即可）。"
-            },
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         Spacer(modifier = Modifier.height(14.dp))

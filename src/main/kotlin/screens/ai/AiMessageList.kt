@@ -41,8 +41,6 @@ import utils.ai.ToolDispatcher
 internal fun AiMessageList(
     messages: List<ChatMessage>,
     listState: LazyListState,
-    showReasoning: Boolean,
-    showToolResults: Boolean,
     onNavigateToTerminal: () -> Unit,
     onContinue: () -> Unit
 ) {
@@ -55,8 +53,6 @@ internal fun AiMessageList(
         items(messages, key = { it.id }) { message ->
             AiMessageBubble(
                 message = message,
-                showReasoning = showReasoning,
-                showToolResults = showToolResults,
                 onNavigateToTerminal = onNavigateToTerminal,
                 onContinue = onContinue
             )
@@ -67,8 +63,6 @@ internal fun AiMessageList(
 @Composable
 private fun AiMessageBubble(
     message: ChatMessage,
-    showReasoning: Boolean,
-    showToolResults: Boolean,
     onNavigateToTerminal: () -> Unit,
     onContinue: () -> Unit
 ) {
@@ -91,8 +85,6 @@ private fun AiMessageBubble(
         } else {
             AiTimeline(
                 message = message,
-                showReasoning = showReasoning,
-                showToolResults = showToolResults,
                 onNavigateToTerminal = onNavigateToTerminal,
                 onContinue = onContinue
             )
@@ -118,20 +110,19 @@ internal fun timelineAccent(segment: ChatSegment): Color {
  * 助手回答的线性时间线：[ChatMessage.segments] 里的分段按**发生顺序**自上而下排列，
  * 正文（回答）作为最后一个节点接在同一条竖线上。
  *
+ * 思考内容与工具返回**一律展示**（原先的「显示思考过程 / 显示工具返回」开关已移除）；
  * 卡片顺序完全由 `segments` 的列表顺序决定（累积事件时只追加、不插队），
  * 因此「思考 → 工具 → 思考 → 工具 → 正文」会如实呈现，不会把思考全挤到最前面。
  */
 @Composable
 private fun AiTimeline(
     message: ChatMessage,
-    showReasoning: Boolean,
-    showToolResults: Boolean,
     onNavigateToTerminal: () -> Unit,
     onContinue: () -> Unit
 ) {
     val nodes = message.segments.filter { segment ->
         when (segment) {
-            is ChatSegment.Thinking -> showReasoning && segment.text.isNotBlank()
+            is ChatSegment.Thinking -> segment.text.isNotBlank()
             is ChatSegment.ToolCallSegment -> true
         }
     }
@@ -156,7 +147,6 @@ private fun AiTimeline(
 
                     is ChatSegment.ToolCallSegment -> AiToolCallBlock(
                         segment = segment,
-                        showResult = showToolResults,
                         onNavigateToTerminal = onNavigateToTerminal,
                         onContinue = onContinue
                     )

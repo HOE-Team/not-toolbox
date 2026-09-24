@@ -153,12 +153,11 @@ object LlmClient {
             put("model", model.modelName.ifBlank { "gpt-4o-mini" })
             put("messages", array)
             put("stream", stream)
-            // 仅对认这个参数的网关显式声明思考开关；不认的网关（thinkingMode=AUTO）不发送。
-            // 不显式声明时，部分 DeepSeek 系模型会默认开启思考，思考阶段只推 reasoning_content，
-            // 正文迟迟不开始，界面上看着就像「伪流式」。
-            if (model.provider.supportsThinking && model.thinkingMode != ThinkingMode.AUTO) {
+            // 支持该参数的提供商一律显式声明思考开关：不声明时部分 DeepSeek 系模型会默认开启思考，
+            // 思考阶段只推 reasoning_content，正文迟迟不开始，界面上看着就像「伪流式」。
+            if (model.provider.supportsThinking) {
                 put("thinking", buildJsonObject {
-                    put("type", if (model.thinkingMode == ThinkingMode.ENABLED) "enabled" else "disabled")
+                    put("type", if (model.thinkingEnabled) "enabled" else "disabled")
                 })
             }
         }

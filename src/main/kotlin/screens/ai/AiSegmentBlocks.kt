@@ -104,11 +104,11 @@ internal fun AiThinkingBlock(text: String, autoExpand: Boolean) {
 /**
  * 工具调用容器：标题行 + 参数 + 结果都装在里面，调用源文本与结果不会裸放在气泡里。
  * 卡片在参数还没拿全时就会建出来（转圈），同一张卡片随后补齐参数与结果——按 id 就地更新。
+ * 工具返回一律展示（不再有「显示工具返回」开关）。
  */
 @Composable
 internal fun AiToolCallBlock(
     segment: ChatSegment.ToolCallSegment,
-    showResult: Boolean,
     onNavigateToTerminal: () -> Unit,
     onContinue: () -> Unit
 ) {
@@ -260,7 +260,7 @@ internal fun AiToolCallBlock(
                 }
 
                 val result = segment.result
-                if (result != null && showResult) {
+                if (result != null) {
                     Spacer(modifier = Modifier.height(6.dp))
                     val full = result.text
                     val visible = if (resultExpanded || full.length <= 400) full else full.take(400) + "…"

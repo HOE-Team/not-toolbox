@@ -38,18 +38,6 @@ enum class LlmProvider(
 }
 
 /**
- * 思考模式。
- *
- * DeepSeek 等网关若不显式传 `thinking`，模型可能默认开启思考：思考阶段只推送
- * reasoning_content（正文尚未开始），看上去就像「伪流式」。
- */
-enum class ThinkingMode(val displayName: String) {
-    AUTO("默认（不发送该参数）"),
-    ENABLED("启用思考"),
-    DISABLED("关闭思考（更快）")
-}
-
-/**
  * 一个模型的配置。API Key 仅以密文（apiKeyEnc）落盘，见 SecretStore。
  */
 @Serializable
@@ -69,8 +57,11 @@ data class AiModelConfig(
     val disabledTools: List<String> = emptyList(),
     /** 写操作（安装 / 更新 / 卸载 / 执行命令）执行前是否需要用户确认 */
     val confirmWriteOps: Boolean = true,
-    /** 思考模式 */
-    val thinkingMode: ThinkingMode = ThinkingMode.DISABLED
+    /**
+     * 是否启用思考（输入区的「启用思考」开关统一管理，默认开启）。
+     * 只在提供商支持 `thinking` 参数的请求里生效，见 [LlmProvider.supportsThinking]。
+     */
+    val thinkingEnabled: Boolean = true
 )
 
 /**

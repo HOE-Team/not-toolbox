@@ -82,6 +82,17 @@ class ChatSession(
     private var continueRequested = false
 
     /**
+     * 当前是否启用思考。可由界面随时切换（输入区的「启用思考」开关），
+     * 只影响之后的请求，**不影响已有历史与上下文**。
+     */
+    private var thinkingEnabled: Boolean = model.thinkingEnabled
+
+    /** 切换「启用思考」（下一次请求生效） */
+    fun setThinkingEnabled(enabled: Boolean) {
+        thinkingEnabled = enabled
+    }
+
+    /**
      * 界面调用：对当前正在执行的工具请求「在执行时继续」。
      * 工具会在下一次轮询时放弃等待，并把「未完成」如实回报给模型（进程继续在终端运行）。
      */
@@ -207,10 +218,16 @@ class ChatSession(
                     pushThinking(delta)
                     publish(emit, coalesce = true)
                 }
-                val result = if (model.useStream) {
-                    LlmClient.stream(model, apiKey, buildMessages(), onDelta, onReasoning)
+                // 思考开关可以随时切换：请求体用当前值，系统提示与历史不受影响
+                val requestModel = if (thinkingEnabled == model.thinkingEnabled) {
+                    model
                 } else {
-                    LlmClient.complete(model, apiKey, buildMessages()).onSuccess { onDelta(it) }
+                    model.copy(thinkingEnabled = thinkingEnabled)
+                }
+                val result = if (requestModel.useStream) {
+                    LlmClient.stream(requestModel, apiKey, buildMessages(), onDelta, onReasoning)
+                } else {
+                    LlmClient.complete(requestModel, apiKey, buildMessages()).onSuccess { onDelta(it) }
                 }
                 val error = result.exceptionOrNull()
                 if (error != null) {

@@ -127,8 +127,6 @@ fun AiScreen(
                     AiMessageList(
                         messages = state.messages,
                         listState = listState,
-                        showReasoning = state.showReasoning,
-                        showToolResults = state.showToolResults,
                         onNavigateToTerminal = onNavigateToTerminal,
                         onContinue = { state.continueRunningTool() }
                     )
@@ -147,10 +145,9 @@ fun AiScreen(
                 onSend = { state.send(deps) },
                 onStop = { state.stop() },
                 busy = state.busy,
-                showReasoning = state.showReasoning,
-                onShowReasoningChange = { state.showReasoning = it },
-                showToolResults = state.showToolResults,
-                onShowToolResultsChange = { state.showToolResults = it }
+                thinkingEnabled = state.thinkingEnabled,
+                thinkingSupported = state.thinkingSupported,
+                onThinkingEnabledChange = { state.setThinkingEnabled(it) }
             )
         }
     }

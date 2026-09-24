@@ -5,7 +5,7 @@
 // Based on: NNETB (©2026 HOE Team, MIT License) and NNETB-For-Linux (©2026 HOE Team, GPL-3.0 License)
 // License: GPL-3.0 (see LICENSE file for details)
 //
-// 底部输入区：显示开关 + 输入框 + 发送 / 停止
+// 底部输入区：启用思考开关 + 输入框 + 发送 / 停止
 
 package screens.ai
 
@@ -26,29 +26,25 @@ internal fun AiInputBar(
     onSend: () -> Unit,
     onStop: () -> Unit,
     busy: Boolean,
-    showReasoning: Boolean,
-    onShowReasoningChange: (Boolean) -> Unit,
-    showToolResults: Boolean,
-    onShowToolResultsChange: (Boolean) -> Unit
+    thinkingEnabled: Boolean,
+    thinkingSupported: Boolean,
+    onThinkingEnabledChange: (Boolean) -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 12.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            AiToggleChip(
-                label = "显示思考过程",
-                checked = showReasoning,
-                onCheckedChange = onShowReasoningChange
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            AiToggleChip(
-                label = "显示工具返回",
-                checked = showToolResults,
-                onCheckedChange = onShowToolResultsChange
-            )
-        }
+        // 思考开关只对支持 thinking 参数的提供商显示——否则是个「点了没用」的假开关
+        if (thinkingSupported) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AiToggleChip(
+                    label = "启用思考",
+                    checked = thinkingEnabled,
+                    onCheckedChange = onThinkingEnabledChange
+                )
+            }
 
-        Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+        }
 
         Row(verticalAlignment = Alignment.Bottom) {
             OutlinedTextField(
@@ -86,7 +82,7 @@ internal fun AiInputBar(
     }
 }
 
-/** 输入区上方的显示开关 */
+/** 输入区上方开关 */
 @Composable
 private fun AiToggleChip(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     FilterChip(
