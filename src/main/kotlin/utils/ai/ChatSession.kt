@@ -48,7 +48,7 @@ sealed class ChatEvent {
  * 1. 系统提示中写清工具清单与调用格式，要求模型把调用写成单独一行 `[TOOL_CALL]{...}`
  * 2. 流式输出时用 [ToolCodec.splitForStreaming] 暂存尾部，保证标记不会泄漏到界面
  * 3. 一轮回答结束后解析出所有工具调用，依次执行并把结果以 [TOOL_RESULT] 回填给模型
- * 4. 最多循环 [AiModelConfig.maxToolIterations] 轮，避免无限调用
+ * 4. **不限制工具调用轮数**：模型不再调用工具（给出最终回答）、出错或用户点「停止」时才结束
  *
  * 时间线（思考段 / 工具调用卡片）由本类**独占**维护：界面只消费 [ChatEvent.Update] 里的快照，
  * 不再自己拼装分段（以前 ChatAgent + ChatTimeline + 界面三处各维护一份，工具卡片还要按名字回找）。
@@ -177,13 +177,16 @@ class ChatSession(
                 return@withLock
             }
             history += LlmMessage("user", userText)
-            val maxIterations = model.maxToolIterations.coerceIn(1, 20)
-            var iteration = 0
-            var answered = false
             // 本轮需要提示用户的说明（如工具调用格式错误）
             var notice: String? = null
-            while (iteration < maxIterations) {
-                iteration++
+            // 不限制工具调用轮数：模型给出最终回答（不再调用工具）、出错或用户点「停止」时才结束。
+            // 用户随时可以用「停止」中断（协程可取消），因此不需要轮数上限。
+            while (true) {
+                // 每轮（一次模型请求）都有一份新的调用清单，而 [announcedIds] 是**按位置**对应这份
+                // 清单的锚点，所以必须按轮清空：否则第二轮会复用上一轮的卡片（把旧卡片改写掉，
+                // 看起来就像时间线错位），同时提前建好的卡片永远拿不到执行结果（永久转圈）。
+                announcedIds.clear()
+                openCardId = null
                 // 增量扫描：只处理新增分块（旧实现每块都重扫整段累积文本）
                 val scanner = ToolCodec.StreamScanner()
                 requestStartedAt = System.currentTimeMillis()
@@ -223,7 +226,6 @@ class ChatSession(
                 history += LlmMessage("assistant", full)
                 val calls = if (specs.isEmpty()) emptyList() else ToolCodec.parseCalls(full)
                 if (calls.isEmpty()) {
-                    answered = true
                     val malformed = if (specs.isEmpty()) emptyList() else ToolCodec.malformedCalls(full)
                     if (malformed.isNotEmpty()) {
                         // 标记写了但格式不对：不再自动重试（重复烧 token），
@@ -293,7 +295,8 @@ class ChatSession(
                     history += LlmMessage("user", "[TOOL_RESULT] " + call.tool + "\n" + toolResult.text)
                 }
             }
-            emit(ChatEvent.Finished(notice ?: if (answered) null else MSG_MAX_ITERATIONS))
+            settleDanglingToolCards()
+            emit(ChatEvent.Finished(notice))
         }
     }
 
@@ -349,15 +352,25 @@ class ChatSession(
         }
     }
 
-    /** 取第 [index] 个调用的容器并置为「执行中」：流式期间已建过的直接复用 */
+    /**
+     * 取第 [index] 个调用的容器并置为「执行中」。
+     *
+     * 只复用「这一轮里为该调用建好、且尚未执行过」的卡片；名称不符或已不处于排队态，
+     * 说明锚点错配——此时**宁可在末尾新建一张，也绝不去改写别的卡片**：
+     * 改写会让时间线错位（旧操作被顶掉、甚至看起来被"重排"）。
+     */
     private fun containerFor(index: Int, call: ToolCall): Long {
         val startedAt = System.currentTimeMillis()
-        if (index < announcedIds.size) {
-            val id = announcedIds[index]
-            replaceSegment(id) {
-                it.copy(call = call, phase = ToolPhase.RUNNING, startedAtMs = startedAt)
+        val announcedId = announcedIds.getOrNull(index)
+        if (announcedId != null) {
+            val candidate = segments.firstOrNull { it is ChatSegment.ToolCallSegment && it.id == announcedId }
+                as? ChatSegment.ToolCallSegment
+            if (candidate != null && candidate.phase == ToolPhase.QUEUED && candidate.call.tool == call.tool) {
+                replaceSegment(announcedId) {
+                    it.copy(call = call, phase = ToolPhase.RUNNING, startedAtMs = startedAt)
+                }
+                return announcedId
             }
-            return id
         }
         val id = nextToolId++
         segments += ChatSegment.ToolCallSegment(
@@ -366,7 +379,6 @@ class ChatSession(
             phase = ToolPhase.RUNNING,
             startedAtMs = startedAt
         )
-        announcedIds += id
         return id
     }
 
@@ -385,6 +397,22 @@ class ChatSession(
     private fun setPhase(id: Long, phase: ToolPhase, startedAtMs: Long = 0L) {
         replaceSegment(id) {
             it.copy(phase = phase, startedAtMs = if (startedAtMs > 0) startedAtMs else it.startedAtMs)
+        }
+    }
+
+    /**
+     * 收尾兜底：正常路径下每张卡片都会被落定，但万一还有处于挂起阶段的卡片
+     * （锚点错配、异常分支等），也在这里落定为失败——界面绝不该出现永远转圈的卡片。
+     */
+    private fun settleDanglingToolCards() {
+        for (i in segments.indices) {
+            val segment = segments[i]
+            if (segment is ChatSegment.ToolCallSegment && segment.phase.isPending) {
+                segments[i] = segment.copy(
+                    phase = ToolPhase.FAILED,
+                    result = ToolResult("未执行（本轮已结束）。", isError = true)
+                )
+            }
         }
     }
 
@@ -412,7 +440,6 @@ class ChatSession(
         const val MSG_NO_KEY = "尚未填写 API Key，请先在「模型设置」中配置模型。"
         const val MSG_NO_MODEL = "尚未填写模型名称，请先在「模型设置」中配置模型。"
         const val MSG_EMPTY_REPLY = "模型返回了空内容，请重试或更换模型。"
-        const val MSG_MAX_ITERATIONS = "已达到工具调用轮数上限，已停止继续调用工具。"
         const val MSG_MALFORMED = "模型的工具调用格式不正确，本轮已停止，请重试或更换模型。"
 
         /** 模型输出了工具标记但格式无法解析时，界面上使用的占位工具名 */

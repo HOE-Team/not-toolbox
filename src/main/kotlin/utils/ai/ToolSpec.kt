@@ -86,7 +86,8 @@ object ToolPrompt {
         sb.append("2. 调用行必须完整写在同一行内：不要换行、不要包进 Markdown 代码块、不要在行内写解释。\n")
         sb.append("3. 执行结果会以 [TOOL_RESULT] 开头回传给你，请据此继续回答或再次调用工具。\n")
         sb.append("4. 不要编造工具结果；信息不足时先调用工具，而不是猜测。\n")
-        sb.append("5. 需要修改系统或执行命令的工具会先弹确认框，用户拒绝时请停止重试并说明原因。\n\n")
+        sb.append("5. 需要修改系统或执行命令的工具会先弹确认框，用户拒绝时请停止重试并说明原因。\n")
+        sb.append("6. 已获得足够信息时请直接给出回答；不要重复调用同一个工具，也不要无意义地连续调用。\n\n")
         sb.append("可用工具：\n")
         for (spec in specs) {
             sb.append("- ").append(spec.name)

@@ -289,19 +289,6 @@ internal fun AiModelForm(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        Spacer(modifier = Modifier.height(10.dp))
-
-        OutlinedTextField(
-            value = draft.maxToolIterations.toString(),
-            onValueChange = { raw ->
-                val parsed = raw.filter { it.isDigit() }.take(2).toIntOrNull()
-                if (parsed != null) draft = draft.copy(maxToolIterations = parsed.coerceIn(1, 20))
-            },
-            label = { Text("单轮回复内最多调用工具轮数") },
-            singleLine = true,
-            modifier = Modifier.width(260.dp)
-        )
-
         Spacer(modifier = Modifier.height(14.dp))
         HorizontalDivider()
         Spacer(modifier = Modifier.height(10.dp))

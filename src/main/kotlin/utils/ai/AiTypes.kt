@@ -69,8 +69,6 @@ data class AiModelConfig(
     val disabledTools: List<String> = emptyList(),
     /** 写操作（安装 / 更新 / 卸载 / 执行命令）执行前是否需要用户确认 */
     val confirmWriteOps: Boolean = true,
-    /** 工具调用循环的最大轮数 */
-    val maxToolIterations: Int = 6,
     /** 思考模式 */
     val thinkingMode: ThinkingMode = ThinkingMode.DISABLED
 )

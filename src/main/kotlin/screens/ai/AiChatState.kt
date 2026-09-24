@@ -35,6 +35,8 @@ import utils.ai.SecretStore
 import utils.ai.ToolCall
 import utils.ai.ToolDispatcher
 import utils.ai.ToolEnv
+import utils.ai.ToolPhase
+import utils.ai.ToolResult
 import kotlin.time.Duration.Companion.milliseconds
 
 /** 会话页需要的外部环境（由 MainApp 透传） */
@@ -225,8 +227,14 @@ class AiChatState(private val scope: CoroutineScope) {
                     messages = messages.updateMessage(assistantId) { it.copy(streaming = false, error = message) }
                 }
             } finally {
-                // 思考段的封口由 ChatSession 负责，这里只落定「生成结束」
-                messages = messages.updateMessage(assistantId) { it.copy(streaming = false) }
+                // 收尾：思考段的封口由 ChatSession 负责；这里兜底把仍挂起的工具卡片落定——
+                // 用户中途「停止」时 runTurn 会被取消，走不到它自己的收尾分支，否则卡片会一直转圈
+                messages = messages.updateMessage(assistantId) { message ->
+                    message.copy(
+                        streaming = false,
+                        segments = settlePendingToolCards(message.segments)
+                    )
+                }
                 busy = false
                 stage = Stage.IDLE
                 job = null
@@ -288,3 +296,20 @@ private fun List<ChatMessage>.updateMessage(
     id: Long,
     transform: (ChatMessage) -> ChatMessage
 ): List<ChatMessage> = map { if (it.id == id) transform(it) else it }
+
+/**
+ * 把仍处于挂起阶段的工具卡片落定为失败。
+ * 界面靠 [ChatSegment.ToolCallSegment.phase] 决定是否转圈，挂起态残留 = 永久转圈，
+ * 因此在「生成结束」这个统一出口处兜底落定。
+ */
+private fun settlePendingToolCards(segments: List<ChatSegment>): List<ChatSegment> =
+    segments.map { segment ->
+        if (segment is ChatSegment.ToolCallSegment && segment.phase.isPending) {
+            segment.copy(
+                phase = ToolPhase.FAILED,
+                result = segment.result ?: ToolResult("已停止，未执行完成。", isError = true)
+            )
+        } else {
+            segment
+        }
+    }
