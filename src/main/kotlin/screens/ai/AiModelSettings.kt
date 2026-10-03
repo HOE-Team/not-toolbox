@@ -55,11 +55,6 @@ internal fun AiModelDialog(
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.weight(1f)
                     )
-                    Text(
-                        text = "密钥保护：" + SecretStore.protectionDescription(),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                     Spacer(modifier = Modifier.width(12.dp))
                     Button(
                         onClick = onDismiss,
@@ -130,6 +125,10 @@ internal fun AiModelDialog(
                                 model = selected,
                                 isActive = selected.id == config.activeModelId,
                                 onSave = { updated -> onConfigChange(config.withModel(updated)) },
+                                // 密钥立即落盘（不等表单的「保存」），且只改这一个字段
+                                onSaveKey = { encrypted ->
+                                    onConfigChange(config.withModel(selected.copy(apiKeyEnc = encrypted)))
+                                },
                                 onActivate = { onConfigChange(config.copy(activeModelId = selected.id)) }
                             )
                         }

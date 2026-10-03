@@ -72,11 +72,13 @@ fun AiScreen(
         )
     }
 
-    // 跟到底部。
-    // 以前的做法是「每个增量都重启一次 animateScrollToItem」——正文越长，滚动动画的重新布局
-    // 越贵，渲染线程会被压住，看上去就像一次性吐出。现在分两条：
+    // 跟到底部。两条规则：
     // 1. 新消息到达：立即滚到底；
-    // 2. 生成期间：每 150ms 节流跟随，而且只有用户本来就在底部时才跟（不抢用户的滚动）。
+    // 2. **AI 输出期间持续跟随**（每 120ms 一次的 scrollToItem，不做动画，避免每个增量重启动画）。
+    //
+    // 注意：**不能**再用 canScrollForward（「是否已经在底部」）当跟随开关——正文是在底部
+    // **继续变长**的，那一刻 canScrollForward 恒为 true，于是永远不跟随（这正是此前
+    // 「AI 输出时不自动滚动」的原因）。只有用户正拖动/惯性滚动的那一刻跳过，避免抢夺滚动。
     LaunchedEffect(state.messages.size) {
         if (state.messages.isNotEmpty()) {
             try {
@@ -88,15 +90,16 @@ fun AiScreen(
     }
     LaunchedEffect(state.busy) {
         while (state.busy) {
-            delay(150)
             val lastIndex = state.messages.lastIndex
-            if (lastIndex >= 0 && !listState.canScrollForward) {
+            if (lastIndex >= 0 && !listState.isScrollInProgress) {
                 try {
+                    // scrollOffset 取最大值 = 直接钉到该条目的底部
                     listState.scrollToItem(lastIndex, scrollOffset = Int.MAX_VALUE)
                 } catch (_: Exception) {
                     // 布局竞态，忽略
                 }
             }
+            delay(FOLLOW_INTERVAL_MS)
         }
     }
 
@@ -366,3 +369,6 @@ private fun AiProgressRow(state: AiChatState) {
         )
     }
 }
+
+/** AI 输出期间跟到底部的节流间隔：既要跟得紧，也不必每帧都滚 */
+private const val FOLLOW_INTERVAL_MS = 120L

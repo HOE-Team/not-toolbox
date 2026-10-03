@@ -58,7 +58,8 @@ private fun AiSwitchRow(
  * 单个模型的详细配置表单。
  *
  * 所有字段先改在本地草稿上，点「保存」才整体落盘（保存会重置当前对话，因此不能每键都做）。
- * API Key 需要点「保存密钥」才加密写入草稿；加密在后台线程做，避免 PBKDF2 卡住界面。
+ * **API Key 例外**：点「保存密钥」会立即加密并落盘（`onSaveKey`），不必再点表单的「保存」；
+ * 输入框内容保留，便于继续改写。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,6 +67,7 @@ internal fun AiModelForm(
     model: AiModelConfig,
     isActive: Boolean,
     onSave: (AiModelConfig) -> Unit,
+    onSaveKey: (String) -> Unit,
     onActivate: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -177,7 +179,7 @@ internal fun AiModelForm(
                 value = keyInput,
                 onValueChange = { keyInput = it },
                 label = { Text("API Key") },
-                placeholder = { Text(if (hasKey) "已加密保存，留空表示不修改" else "粘贴 API Key") },
+                placeholder = { Text(if (hasKey) "已保存，重新填写可覆盖" else "粘贴 API Key") },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.weight(1f)
@@ -192,7 +194,8 @@ internal fun AiModelForm(
                     scope.launch {
                         val encrypted = withContext(Dispatchers.Default) { SecretStore.protect(raw) }
                         draft = draft.copy(apiKeyEnc = encrypted)
-                        keyInput = ""
+                        // 及时保存：立即落盘，不必再点表单底部的「保存」；输入框内容保留，便于再次修改
+                        onSaveKey(encrypted)
                         keyBusy = false
                     }
                 },
@@ -200,21 +203,7 @@ internal fun AiModelForm(
             ) {
                 Text(if (keyBusy) "加密中…" else "保存密钥")
             }
-            if (hasKey) {
-                Spacer(modifier = Modifier.width(8.dp))
-                TextButton(onClick = { draft = draft.copy(apiKeyEnc = "") }) {
-                    Text("清除", color = MaterialTheme.colorScheme.error)
-                }
-            }
         }
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        Text(
-            text = "密钥状态：" + if (hasKey) "已保存（修改后需点「保存」生效）" else "尚未保存",
-            style = MaterialTheme.typography.labelSmall,
-            color = if (hasKey) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-        )
 
         Spacer(modifier = Modifier.height(10.dp))
 
