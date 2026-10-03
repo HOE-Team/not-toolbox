@@ -18,6 +18,8 @@
 > [!NOTE]
 > 我们诚挚的邀请您参与我们的生态建设，欢迎通过Issue、Pull Request协助我们开发NOT Toolbox及[资源仓库](https://github.com/HOE-Team/not-toolbox-resource)，我们将不胜感激。
 
+> [!NOTE]
+> Agent 功能正在测试！点击[此处](https://github.com/HOE-Team/not-toolbox/releases/tag/O-1.0.7-Snapshot-w38a)了解最新的功能更改
 
 ## 📑 目录
 
