@@ -7,6 +7,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import icons.keyboard_arrow_down
 import icons.keyboard_arrow_right
 import icons.neurology
+import icons.save
+import icons.visibility
+import icons.visibility_off
+import java.awt.Image
+import java.beans.Visibility
 
 /**
  * 统一的 Material Symbols 图标管理对象。
@@ -215,4 +220,13 @@ object MaterialSymbols {
 
     /**KeyboardArrowRight**/
     val KeyboardArrowRight: ImageVector = keyboard_arrow_right
+
+    /**VisibilityOff**/
+    val VisibilityOff: ImageVector = visibility_off
+
+    /**Visibility**/
+    val VisibilitySymbol: ImageVector = visibility
+
+    /**Save**/
+    val Save: ImageVector = save
 }

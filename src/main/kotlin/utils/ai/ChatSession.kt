@@ -55,7 +55,7 @@ sealed class ChatEvent {
  */
 class ChatSession(
     private val model: AiModelConfig,
-    private val apiKey: String,
+    apiKey: String,
     private val specs: List<ToolSpec>,
     private val toolEnv: ToolEnv,
     envSummary: String
@@ -63,6 +63,12 @@ class ChatSession(
     private val history = mutableListOf<LlmMessage>()
     private val turnMutex = Mutex()
     private val systemPrompt: String = buildSystemPrompt(envSummary)
+
+    /**
+     * 当前使用的 API Key。可在会话进行中被替换（见 [setApiKey]），
+     * 因此用户随时改密钥都会在下一个请求生效，且**不会丢掉对话历史**。
+     */
+    private var apiKey: String = apiKey
 
     /** 当前回答的时间线分段（只追加 / 就地更新，绝不重排） */
     private val segments = mutableListOf<ChatSegment>()
@@ -90,6 +96,11 @@ class ChatSession(
     /** 切换「启用思考」（下一次请求生效） */
     fun setThinkingEnabled(enabled: Boolean) {
         thinkingEnabled = enabled
+    }
+
+    /** 更换 API Key（下一次请求生效；历史与上下文保留，不必重开对话） */
+    fun setApiKey(key: String) {
+        apiKey = key
     }
 
     /**

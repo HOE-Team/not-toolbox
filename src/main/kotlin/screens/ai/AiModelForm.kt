@@ -18,16 +18,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import components.MaterialSymbols
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import utils.ai.AiModelConfig
 import utils.ai.LlmProvider
 import utils.ai.SecretStore
 import utils.ai.ToolDanger
 import utils.ai.ToolDispatcher
+
+/** API Key 自动保存的防抖时长：停止输入这么久之后才加密落盘 */
+private const val KEY_SAVE_DEBOUNCE_MS = 700L
 
 /** 表单里的开关行 */
 @Composable
@@ -58,8 +62,8 @@ private fun AiSwitchRow(
  * 单个模型的详细配置表单。
  *
  * 所有字段先改在本地草稿上，点「保存」才整体落盘（保存会重置当前对话，因此不能每键都做）。
- * **API Key 例外**：点「保存密钥」会立即加密并落盘（`onSaveKey`），不必再点表单的「保存」；
- * 输入框内容保留，便于继续改写。
+ * **API Key 例外**：表单会载入已保存密钥的明文，用户可直接就地修改；改动静默防抖后自动加密落盘
+ * （`onSaveKey`），不需要重新输入整段，也不必再点表单的「保存」。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,16 +71,39 @@ internal fun AiModelForm(
     model: AiModelConfig,
     isActive: Boolean,
     onSave: (AiModelConfig) -> Unit,
-    onSaveKey: (String) -> Unit,
+    onSaveKey: (encrypted: String, plain: String) -> Unit,
     onActivate: () -> Unit
 ) {
-    val scope = rememberCoroutineScope()
     var draft by remember(model.id) { mutableStateOf(model) }
+    // API Key：输入框直接放已保存密钥的明文（默认按密码遮蔽），因此可以改任意一位
     var keyInput by remember(model.id) { mutableStateOf("") }
-    var keyBusy by remember(model.id) { mutableStateOf(false) }
+
+    /** 已经落盘的密钥明文：用来判断输入框是否有改动（null = 还没载入） */
+    var savedKey by remember(model.id) { mutableStateOf<String?>(null) }
+    var keyVisible by remember(model.id) { mutableStateOf(false) }
     var providerExpanded by remember { mutableStateOf(false) }
-    val hasKey = draft.apiKeyEnc.isNotBlank()
     val dirty = draft != model
+
+    // 载入密钥明文（解密放后台线程）。切换模型、或密钥在别处被改写时同步过来；
+    // 用户正在输入（与已保存值不同）时不覆盖，避免打字被回滚。
+    LaunchedEffect(model.id, model.apiKeyEnc) {
+        if (keyInput.isNotEmpty() && keyInput != savedKey) return@LaunchedEffect
+        val plain = withContext(Dispatchers.Default) { SecretStore.unprotect(model.apiKeyEnc) }
+        savedKey = plain
+        keyInput = plain
+    }
+
+    // 改动后静默自动保存：防抖到停止输入再加密落盘（每次都加密会明显卡顿）
+    LaunchedEffect(keyInput, savedKey) {
+        val target = keyInput.trim()
+        if (savedKey == null || target == savedKey) return@LaunchedEffect
+        delay(KEY_SAVE_DEBOUNCE_MS)
+        val encrypted = withContext(Dispatchers.Default) { SecretStore.protect(target) }
+        // 同步草稿里的密文，否则「保存」按钮会把旧密文写回去
+        savedKey = target
+        draft = draft.copy(apiKeyEnc = encrypted)
+        onSaveKey(encrypted, target)
+    }
 
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -95,7 +122,7 @@ internal fun AiModelForm(
             }
             Spacer(modifier = Modifier.width(8.dp))
             Button(onClick = { onSave(draft) }, enabled = dirty) {
-                Icon(MaterialSymbols.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                Icon(MaterialSymbols.Save, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
                 Text("保存")
             }
@@ -174,36 +201,41 @@ internal fun AiModelForm(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = keyInput,
-                onValueChange = { keyInput = it },
-                label = { Text("API Key") },
-                placeholder = { Text(if (hasKey) "已保存，重新填写可覆盖" else "粘贴 API Key") },
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.weight(1f)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Button(
-                onClick = {
-                    val raw = keyInput.trim()
-                    if (raw.isEmpty()) return@Button
-                    keyBusy = true
-                    // 加密（PBKDF2）放到后台线程，避免卡住界面
-                    scope.launch {
-                        val encrypted = withContext(Dispatchers.Default) { SecretStore.protect(raw) }
-                        draft = draft.copy(apiKeyEnc = encrypted)
-                        // 及时保存：立即落盘，不必再点表单底部的「保存」；输入框内容保留，便于再次修改
-                        onSaveKey(encrypted)
-                        keyBusy = false
-                    }
-                },
-                enabled = keyInput.isNotBlank() && !keyBusy
-            ) {
-                Text(if (keyBusy) "加密中…" else "保存密钥")
-            }
-        }
+        OutlinedTextField(
+            value = keyInput,
+            onValueChange = { keyInput = it },
+            label = { Text("API Key") },
+            placeholder = { Text("粘贴 API Key") },
+            singleLine = true,
+            // 默认按密码遮蔽，点右侧眼睛图标在「明文 / 遮蔽」之间切换
+            visualTransformation = if (keyVisible) {
+                VisualTransformation.None
+            } else {
+                PasswordVisualTransformation()
+            },
+            trailingIcon = {
+                IconButton(onClick = { keyVisible = !keyVisible }) {
+                    Icon(
+                        imageVector = if (keyVisible) {
+                            MaterialSymbols.VisibilityOff
+                        } else {
+                            MaterialSymbols.VisibilitySymbol
+                        },
+                        contentDescription = if (keyVisible) "隐藏密钥" else "显示密钥",
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text(
+            text = "已保存的密钥会填入本框，直接改任意一位即可；停止输入后自动保存并立即生效（清空即删除密钥）。",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
 
         Spacer(modifier = Modifier.height(10.dp))
 

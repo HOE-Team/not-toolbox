@@ -27,18 +27,20 @@ import components.MaterialSymbols
 import utils.ai.AiAppConfig
 import utils.ai.AiModelConfig
 import utils.ai.LlmProvider
-import utils.ai.SecretStore
 
 /**
  * 模型设置对话框：左侧模型列表，右侧模型详情表单。
  *
  * 列表操作（新增 / 删除 / 设为当前）即时保存；表单改动先在本地草稿里编辑，点「保存」才落盘。
  * 以前每敲一个字符都会写一次 ai_config.json，还会顺手丢掉整个对话，编辑体验很差。
+ *
+ * 唯一的例外是 API Key：它是密码框，改动静默防抖后立即落盘（`onSaveKey`），不必再点「保存」。
  */
 @Composable
 internal fun AiModelDialog(
     config: AiAppConfig,
     onConfigChange: (AiAppConfig) -> Unit,
+    onSaveKey: (config: AiAppConfig, modelId: String, plain: String) -> Unit,
     onDismiss: () -> Unit
 ) {
     var selectedId by remember { mutableStateOf(config.activeModel()?.id ?: "") }
@@ -125,9 +127,13 @@ internal fun AiModelDialog(
                                 model = selected,
                                 isActive = selected.id == config.activeModelId,
                                 onSave = { updated -> onConfigChange(config.withModel(updated)) },
-                                // 密钥立即落盘（不等表单的「保存」），且只改这一个字段
-                                onSaveKey = { encrypted ->
-                                    onConfigChange(config.withModel(selected.copy(apiKeyEnc = encrypted)))
+                                // 密钥改动后立即落盘（不等表单的「保存」），且只改这一个字段
+                                onSaveKey = { encrypted, plain ->
+                                    onSaveKey(
+                                        config.withModel(selected.copy(apiKeyEnc = encrypted)),
+                                        selected.id,
+                                        plain
+                                    )
                                 },
                                 onActivate = { onConfigChange(config.copy(activeModelId = selected.id)) }
                             )

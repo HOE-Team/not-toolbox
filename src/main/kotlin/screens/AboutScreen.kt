@@ -91,7 +91,7 @@ fun AboutScreen() {
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "版本：O-1.0.7",
+            text = "版本：O-1.0.7-Snapshot-w40a",
             style = MaterialTheme.typography.bodyMedium
         )
 

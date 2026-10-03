@@ -52,7 +52,7 @@ data class AiChatDeps(
  *
  * 由 MainApp 持有（应用级作用域），页面只读状态、只调用方法；切页不再丢对话，生成中切页也不会被取消。
  *
- * **对话只存在于内存中：绝不落盘。** 不写任何对话日志/缓存文件，进程退出即清空；
+ * 对话只存在于内存中不写任何对话日志/缓存文件，进程退出即清空；
  * 只有模型配置（`config/ai_config.json`）与加密后的 API Key 会落盘。
  * 后续如需"恢复上次对话"，应先与产品/隐私要求确认，不要顺手加文件写入。
  *
@@ -125,8 +125,8 @@ class AiChatState(private val scope: CoroutineScope) {
     /**
      * 保存配置。
      *
-     * @param keepSession true 时保留当前会话（如只切换了思考模式：它只影响之后的请求，
-     *   不该把对话历史一起丢掉）；默认丢弃，因为模型 / 密钥 / 提示词 / 工具集改动都会让旧会话失效。
+     * @param keepSession true 时保留当前会话（如只切换了思考模式或换了 API Key：它们只影响之后的请求，
+     *   不该把对话历史一起丢掉）；默认丢弃，因为模型 / 提示词 / 工具集改动都会让旧会话失效。
      */
     fun persist(newConfig: AiAppConfig, keepSession: Boolean = false) {
         config = newConfig
@@ -140,6 +140,17 @@ class AiChatState(private val scope: CoroutineScope) {
         if (model.thinkingEnabled == enabled) return
         session?.setThinkingEnabled(enabled)
         persist(config.withModel(model.copy(thinkingEnabled = enabled)), keepSession = true)
+    }
+
+    /**
+     * 保存 API Key（就地修改）：立即落盘；若改的正是当前会话使用的模型，
+     * 则把新密钥同步给会话——下一个请求立即生效，且**不丢对话历史**。
+     *
+     * 输入框里展示的就是已保存的密钥，用户改哪一位就存哪一位，无需重新输入整段。
+     */
+    fun saveApiKey(newConfig: AiAppConfig, modelId: String, plain: String) {
+        if (newConfig.activeModelId == modelId) session?.setApiKey(plain)
+        persist(newConfig, keepSession = true)
     }
 
     fun startNewConversation() {

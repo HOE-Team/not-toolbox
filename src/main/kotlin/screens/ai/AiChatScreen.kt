@@ -159,6 +159,7 @@ fun AiScreen(
         AiModelDialog(
             config = state.config,
             onConfigChange = { state.persist(it) },
+            onSaveKey = { cfg, modelId, plain -> state.saveApiKey(cfg, modelId, plain) },
             onDismiss = { showModelDialog = false }
         )
     }
