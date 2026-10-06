@@ -19,7 +19,7 @@
 > 我们诚挚的邀请您参与我们的生态建设，欢迎通过Issue、Pull Request协助我们开发NOT Toolbox及[资源仓库](https://github.com/HOE-Team/not-toolbox-resource)，我们将不胜感激。
 
 > [!NOTE]
-> Agent 功能正在测试！点击[此处](https://github.com/HOE-Team/not-toolbox/releases/tag/O-1.0.7-Snapshot-w38a)了解最新的功能更改
+> Agent 功能已经进入发布候选阶段！点击[此处](https://github.com/HOE-Team/not-toolbox/releases/tag/O-1.0.7-RC1)了解最新的功能更改
 
 ## 📑 目录
 
@@ -182,20 +182,21 @@ not-toolbox/
 └── README.md                # 项目说明
 ```
 
-## 🔗 技术栈
+## 🔗 技术栈及许可信息
 
-| 组件 | 用途 | 开源协议 |
-|------|------|------|
-| [Kotlin](https://kotlinlang.org/) | 主要编程语言 | Apache 2.0 |
-| [Compose Multiplatform](https://kotlinlang.org/compose-multiplatform/) | 跨平台声明式 UI 框架 | Apache 2.0 |
-| [OSHI](https://github.com/oshi/oshi) | 操作系统和硬件信息获取 | MIT |
-| [Ktor](https://ktor.io) | 异步网络框架 | Apache 2.0 |
-| [Gradle(Kotlin DSL)](https://gradle.org/) | 编译工具 | GPL 2.0 |
-| [Skiko](https://github.com/JetBrains/skiko) | 渲染库 | Apache 2.0 |
-| [Python](https://python.org) | Windows启动器使用语言 | PSF 2.0 |
-| [PyInstaller](https://pyinstaller.org) | 启动器打包工具 | GPL 2.0 |
+| 组件 | 用途                        | 开源协议           |
+|------|-----------------------------|--------------------|
+| [Kotlin](https://kotlinlang.org/) | 主要编程语言                | Apache 2.0         |
+| [Compose Multiplatform](https://kotlinlang.org/compose-multiplatform/) | 跨平台声明式 UI 框架        | Apache 2.0         |
+| [OSHI](https://github.com/oshi/oshi) | 操作系统和硬件信息获取      | MIT                |
+| [Ktor](https://ktor.io) | 异步网络框架                | Apache 2.0         |
+| [Gradle(Kotlin DSL)](https://gradle.org/) | 编译工具                    | GPL 2.0            |
+| [ProGuard](https://github.com/Guardsquare/proguard) | 混淆与压缩工具 | GPL2.0 |            |
+| [Skiko](https://github.com/JetBrains/skiko) | 渲染库                      | Apache 2.0         |
+| [Python](https://python.org) | Windows启动器使用语言       | PSF 2.0            |
+| [PyInstaller](https://pyinstaller.org) | 启动器打包工具              | GPL 2.0            |
 | [Inno Setup](https://jrsoftware.org/isdl.php) | Windows平台安装程序打包工具 | Inno Setup License |
-
+| [Multiplatform Markdown Render](https://github.com/mikepenz/multiplatform-markdown-renderer) | 跨平台Markdown渲染库        | Apache 2.0         |
 ## 📬 联系方式
 
 你可以通过我们的电子邮箱 hoe_software_team@outlook.com 发送邮件联系我们，或者加入我们的团队QQ群：1081639867。
