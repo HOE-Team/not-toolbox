@@ -41,11 +41,6 @@ object SecretStore {
 
     private val isWindows: Boolean by lazy { System.getProperty("os.name", "").lowercase().contains("windows") }
     private val saltPath: Path = Path.of("config", ".ai_key")
-
-    /** 供界面展示的当前保护级别说明 */
-    fun protectionDescription(): String =
-        if (isWindows) "Windows DPAPI（当前用户）" else "本机 AES-256-GCM（config/.ai_key）"
-
     /** 加密；空串原样返回 */
     fun protect(plain: String): String {
         if (plain.isEmpty()) return ""

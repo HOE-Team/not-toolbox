@@ -25,7 +25,7 @@ import kotlin.concurrent.thread
 object SystemInfoProvider {
     private val si = SystemInfo()
     private val hardware = si.hardware
-    // cached memory frequency (MHz) populated asynchronously to avoid blocking calls
+    // 缓存的内存频率（MHz），异步填充以避免阻塞调用
     @Volatile
     private var memFreqMHzCached: Long = 0L
 
@@ -40,15 +40,13 @@ object SystemInfoProvider {
 
     init {
         detectMemFreqAsync()
-        // Pre-start bluetooth detection immediately so the card is visible on
-        // the very first render (instead of appearing after a few seconds).
+        // 立即预启动蓝牙探测，使卡片在首帧渲染时就可见
+        // （而不是几秒后才出现）。
         refreshBluetoothAsync()
-        // Pre-start present-GPU detection so the "已安装的GPU" card is correct
-        // from the first render (without it, the first frame may briefly show
-        // ghost GPUs before the background refresh completes).
+        // 预启动在位显卡探测，使"已安装的GPU"卡片在首帧渲染时就正确
+        // （否则首帧会短暂显示历史幽灵显卡，直到后台刷新完成）。
         refreshPresentGpusAsync()
-        // Pre-start cellular/LTE detection so the network icon and operator are
-        // correct from the first render.
+        // 预启动蜂窝/LTE 探测，使网络图标与运营商在首帧渲染时就正确。
         refreshCellularAsync()
     }
 
@@ -65,7 +63,7 @@ object SystemInfoProvider {
     }
 
     private fun detectMemFreq(): Long {
-        // Reflection-based detection (same heuristics as before)
+        // 基于反射的探测（沿用此前的启发式策略）
         try {
             val memory = hardware.memory
             var physList: List<*>? = null
@@ -105,11 +103,11 @@ object SystemInfoProvider {
         } catch (_: Exception) {
         }
 
-        // Platform-specific fallback
+        // 平台相关的兜底方案
         val os = System.getProperty("os.name").lowercase()
         
         if (os.contains("windows")) {
-            // Windows fallback
+            // Windows 兜底方案
             try {
                 val out = executeCommand("powershell -Command \"Get-CimInstance -ClassName Win32_PhysicalMemory | Select-Object -ExpandProperty Speed\"")
                 val lines = out.lines().map { it.trim() }.filter { it.matches(Regex("^\\d+$")) }
@@ -120,7 +118,7 @@ object SystemInfoProvider {
             } catch (_: Exception) {
             }
         } else if (os.contains("linux")) {
-            // Linux fallback using dmidecode
+            // 使用 dmidecode 的 Linux 兜底方案
             try {
                 val out = executeCommand("sudo dmidecode -t memory 2>/dev/null || dmidecode -t memory 2>/dev/null")
                 val lines = out.lines()
@@ -137,7 +135,7 @@ object SystemInfoProvider {
             } catch (_: Exception) {
             }
             
-            // Alternative: check /proc/cpuinfo for memory speed hints
+            // 备选方案：从 /proc/cpuinfo 读取内存频率线索
             try {
                 val out = executeCommand("cat /proc/cpuinfo 2>/dev/null | grep -i mhz | head -1")
                 if (out.isNotBlank()) {
@@ -168,14 +166,13 @@ object SystemInfoProvider {
         return null
     }
 
-    // Version of executeCommand that forces UTF-8 decoding. Used for PowerShell
-    // commands whose output may contain non-ASCII text (e.g. bluetooth device
-    // names with Chinese characters). Without explicit UTF-8 decoding the raw
-    // bytes get misinterpreted and render as garbled text (乱码).
+    // executeCommand 的 UTF-8 强制解码版本，用于输出可能包含非 ASCII 文本的
+    // PowerShell 命令（例如带中文的蓝牙设备名）。若不显式按 UTF-8 解码，
+    // 原始字节会被错误解读并显示为乱码。
     private fun executeCommandUtf8(command: String): String {
         return try {
             val os = System.getProperty("os.name").lowercase()
-            // Wrap so PowerShell writes UTF-8 to stdout regardless of code page.
+            // 包装命令，使 PowerShell 无论当前代码页如何都以 UTF-8 写入 stdout。
             val utf8Command = if (os.contains("windows")) {
                 "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; $command"
             } else {
@@ -198,7 +195,7 @@ object SystemInfoProvider {
             val process = if (os.contains("windows")) {
                 Runtime.getRuntime().exec(arrayOf("cmd.exe", "/c", command))
             } else {
-                // For Linux/macOS, use bash/sh
+                // Linux/macOS 使用 bash/sh
                 Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
             }
             runProcessWithTimeout(process, Charset.defaultCharset()).trim()
@@ -227,10 +224,10 @@ object SystemInfoProvider {
         return output
     }
 
-    // Cache previous CPU ticks for non-blocking load calculation
+    // 缓存上一次的 CPU ticks，用于非阻塞地计算负载
     private var prevCpuTicks: LongArray? = null
 
-    // Network IO tracking (raw bytes + timestamp for rate calculation)
+    // 网络 I/O 跟踪（原始字节数 + 时间戳，用于计算速率）
     @Volatile
     private var prevNetRxBytes = 0L
     @Volatile
@@ -238,7 +235,7 @@ object SystemInfoProvider {
     @Volatile
     private var prevNetSampleNanos = 0L
 
-    // WiFi SSID + IPv4 detection (cached, refreshed periodically to avoid blocking subprocesses every second)
+    // WiFi SSID + IPv4 探测（带缓存，定期刷新，避免每秒执行阻塞式子进程）
     @Volatile
     private var cachedSSID: String? = null
     @Volatile
@@ -252,25 +249,22 @@ object SystemInfoProvider {
     private var wifiLastRefreshNanos = 0L
     private val WIFI_REFRESH_INTERVAL_NANOS = 10_000_000_000L  // every 10s
 
-    // Set of GPU display names that are currently present (Windows only).
-    // OSHI's hardware.graphicsCards reads the registry class key for display
-    // adapters, which retains a "ghost" entry for every GPU ever installed on
-    // the machine — even after the card is physically removed. We therefore
-    // cross-reference against the PnP "Display" class and keep only the cards
-    // that are currently present (Status OK/Started; non-present ghosts report
-    // "Unknown"). Refreshed on a background thread because GPU hardware is
-    // essentially static and calling PowerShell from the UI thread would block.
+    // 当前在位显卡显示名集合（仅 Windows）。
+    // OSHI 的 hardware.graphicsCards 会读取注册表中显示适配器的类键，而该键会为
+    // 机器上安装过的每块显卡保留一条"幽灵"记录——即使显卡已被物理移除。因此这里
+    // 与 PnP 的 "Display" 类交叉比对，只保留当前在位的显卡（状态为 OK/Started；
+    // 不在位的幽灵设备状态为 "Unknown"）。由于显卡硬件基本静态，且在 UI 线程调用
+    // PowerShell 会阻塞，故改在后台线程刷新。
     @Volatile
     private var cachedPresentGpus: Set<String> = emptySet()
     private var gpuPresentRefreshNanos = 0L
     private val GPU_PRESENT_REFRESH_INTERVAL_NANOS = 30_000_000_000L  // every 30s
 
-    // Cellular / LTE detection state (Windows only). Cached and refreshed on a
-    // background thread because getNetworkIO() runs on the UI thread and calling
-    // `netsh mbn` synchronously every second would block it. Determined via
-    // `netsh mbn show interfaces`: if a Mobile Broadband interface reports
-    // "State : Connected", the machine is currently using a cellular network, and
-    // that interface's "Provider Name" is the network operator.
+    // 蜂窝 / LTE 探测状态（仅 Windows）。因 getNetworkIO() 运行在 UI 线程，
+    // 每秒同步调用 `netsh mbn` 会阻塞，故带缓存并在后台线程刷新。
+    // 通过 `netsh mbn show interfaces` 判定：若某个移动宽带接口报告
+    // "State : Connected"，说明当前正在使用蜂窝网络，且该接口的
+    // "Provider Name" 即为运营商。
     @Volatile
     private var cachedCellularConnected = false
     @Volatile
@@ -305,7 +299,7 @@ object SystemInfoProvider {
         }
     }
 
-    // Keywords that indicate a virtual / software (non-physical) network adapter.
+    // 用于识别虚拟 / 软件（非物理）网络适配器的关键字。
     private val virtualAdapterKeywords = listOf(
         "virtual", "vmware", "hyper-v", "hyperv", "vbox", "virtualbox",
         "loopback", "tap-", "tun", "wan miniport", "bluetooth",
@@ -318,8 +312,8 @@ object SystemInfoProvider {
             var ip: String? = null
             var nicName: String? = null
             var mac: String? = null
-            // Physical adapter names from OSHI's display names (e.g. "Intel Dual-Band Wireless AC-8625"),
-            // filtering out virtual / software adapters.
+            // 取自 OSHI 显示名的物理适配器名称（如 "Intel Dual-Band Wireless AC-8625"），
+            // 过滤掉虚拟 / 软件适配器。
             val adapters = mutableListOf<String>()
             try {
                 for (net in hardware.networkIFs) {
@@ -333,7 +327,7 @@ object SystemInfoProvider {
                 }
             } catch (_: Exception) {
             }
-            // Use the standard JDK API (robust across OSHI versions) for the active NIC identity.
+            // 使用标准 JDK API（跨 OSHI 版本更稳健）获取活动网卡身份信息。
             val interfaces = java.net.NetworkInterface.getNetworkInterfaces()
             if (interfaces != null) {
                 for (nif in interfaces) {
@@ -369,7 +363,7 @@ object SystemInfoProvider {
         }
     }
 
-    // Start cellular/LTE detection on a background thread (non-blocking).
+    // 在后台线程启动蜂窝/LTE 探测（非阻塞）。
     private fun refreshCellularAsync() {
         thread(start = true, isDaemon = true) {
             try {
@@ -380,12 +374,10 @@ object SystemInfoProvider {
         }
     }
 
-    // Detect whether the machine is currently using a cellular (LTE/WWAN)
-    // network and, if so, the network operator. On Windows, `netsh mbn show
-    // interfaces` lists every Mobile Broadband interface with its connect State
-    // and Provider Name; a "Connected" interface means cellular is in use. On
-    // non-Windows systems there is no mobile broadband concept, so we skip.
-    // Any parse/query failure leaves the cached flags untouched (safe defaults).
+    // 探测机器当前是否在使用蜂窝（LTE/WWAN）网络，若是则识别运营商。Windows 上
+    // `netsh mbn show interfaces` 会列出每个移动宽带接口的连接状态与运营商名称；
+    // 某接口为 "Connected" 即表示正在使用蜂窝网络。非 Windows 系统没有移动宽带
+    // 概念，直接跳过。任何解析 / 查询失败都保持缓存标志不变（安全默认值）。
     private fun refreshCellular() {
         val os = System.getProperty("os.name").lowercase()
         if (!os.contains("windows")) return
@@ -403,7 +395,7 @@ object SystemInfoProvider {
                 val value = line.substring(idx + 1).trim()
                 when {
                     key == "name" || key == "interface name" -> {
-                        // Start of a new interface block; reset block-local state.
+                        // 新的接口块开始，重置块内局部状态。
                         blockConnected = false
                     }
                     key == "state" -> {
@@ -424,22 +416,22 @@ object SystemInfoProvider {
     fun getNetworkIO(): NetworkIOInfo {
         val now = System.nanoTime()
 
-        // Periodically refresh WiFi SSID / IPv4 without blocking every second
+        // 定期刷新 WiFi SSID / IPv4，避免每秒阻塞
         if (now - wifiLastRefreshNanos > WIFI_REFRESH_INTERVAL_NANOS) {
             refreshWifiSsid()
             refreshNetworkIdentity()
             wifiLastRefreshNanos = now
         }
 
-        // Periodically refresh cellular/LTE detection on a background thread
-        // (never blocking the UI thread).
+        // 在后台线程定期刷新蜂窝/LTE 探测
+        // （绝不阻塞 UI 线程）。
         if (now - cellularRefreshNanos > CELLULAR_REFRESH_INTERVAL_NANOS) {
             cellularRefreshNanos = now
             refreshCellularAsync()
         }
 
-        // Resolve the active connection type. WiFi (SSID) takes precedence, then
-        // cellular, then a plain wired IPv4 connection, else none/other.
+        // 判定当前活动连接类型：优先 WiFi（有 SSID），其次蜂窝，
+        // 再次普通有线 IPv4 连接，否则为无 / 其他。
         val connectionType = when {
             !cachedSSID.isNullOrBlank() -> NetworkConnectionType.WIFI
             cachedCellularConnected -> NetworkConnectionType.CELLULAR
@@ -448,7 +440,7 @@ object SystemInfoProvider {
         }
         val operatorName = cachedOperatorName.takeIf { connectionType == NetworkConnectionType.CELLULAR }
 
-        // Accumulate raw counters across all interfaces
+        // 累加所有接口的原始计数器
         var rx = 0L
         var tx = 0L
         try {
@@ -487,7 +479,7 @@ object SystemInfoProvider {
         )
     }
 
-    // Start present-GPU detection on a background thread (non-blocking).
+    // 在后台线程启动在位显卡探测（非阻塞）。
     private fun refreshPresentGpusAsync() {
         thread(start = true, isDaemon = true) {
             try {
@@ -498,12 +490,10 @@ object SystemInfoProvider {
         }
     }
 
-    // Populate cachedPresentGpus with the display names of GPUs that are
-    // currently present on the system. On Windows, ghost devices (GPUs that
-    // were installed in the past but are no longer present) report a PnP Status
-    // of "Unknown", while present devices report "OK"/"Started". Only overwrite
-    // the cache with a non-empty result so a transient query failure never
-    // hides real GPUs. On non-Windows systems OSHI's list is already accurate.
+    // 将系统当前在位显卡的显示名写入 cachedPresentGpus。Windows 上，幽灵设备
+    // （过去安装过但已不在位的显卡）的 PnP 状态为 "Unknown"，而在位设备的状态为
+    // "OK"/"Started"。仅当结果非空时才覆盖缓存，避免偶发的查询失败把真实显卡
+    // 隐藏掉。非 Windows 系统上 OSHI 的列表本身已准确。
     private fun refreshPresentGpus() {
         val os = System.getProperty("os.name").lowercase()
         if (!os.contains("windows")) return
@@ -522,14 +512,13 @@ object SystemInfoProvider {
         }
     }
 
-    // Normalize a GPU name for tolerant comparison (trim, lowercase, collapse
-    // runs of whitespace) because OSHI and PnP may differ slightly in spelling.
+    // 归一化显卡名称以便宽容比较（去空白、转小写、合并连续空白），
+    // 因为 OSHI 与 PnP 的拼写可能略有差异。
     private fun normalizeGpuName(name: String): String =
         name.trim().lowercase().replace(Regex("\\s+"), " ")
 
-    // Lenient equality: identical after normalization, or one is contained in
-    // the other. Falls back to containment so minor vendor-string differences
-    // don't cause a genuinely-present GPU to be filtered out.
+    // 宽松相等判定：归一化后完全相同，或一方包含另一方。采用包含判定作为兜底，
+    // 避免厂商字符串的细微差异导致真实在位的显卡被过滤掉。
     private fun gpuNamesMatch(a: String, b: String): Boolean {
         val na = normalizeGpuName(a)
         val nb = normalizeGpuName(b)
@@ -538,7 +527,7 @@ object SystemInfoProvider {
     }
 
     fun getSystemInfo(): SystemInfoSnapshot {
-        // CPU
+        // 处理器（CPU）
         val processor = hardware.processor
         val cpuModel = processor.processorIdentifier.name ?: "Unknown"
         val cpuStepping = processor.processorIdentifier.stepping
@@ -568,7 +557,7 @@ object SystemInfoProvider {
             currentFreq = currentFreqGHz
         )
 
-        // RAM
+        // 内存（RAM）
         val memory = hardware.memory
         val memoryUsedGB = ((memory.total - memory.available) / (1024.0 * 1024.0 * 1024.0))
         val memoryTotalGB = (memory.total / (1024.0 * 1024.0 * 1024.0))
@@ -581,14 +570,12 @@ object SystemInfoProvider {
             usage = memoryUsagePercent
         )
 
-        // GPU
-        // OSHI's hardware.graphicsCards on Windows reads the registry class key
-        // for display adapters, which retains a "ghost" entry for every GPU ever
-        // installed — even after the card is removed. This made the "已安装的GPU"
-        // card list several GPUs when only one is present. We refresh the set of
-        // currently-present PnP display devices on a background thread and keep
-        // only cards that match. If the present set is empty (non-Windows or the
-        // query failed), we fall back to OSHI's full list rather than hiding GPUs.
+        // 显卡（GPU）
+        // OSHI 的 hardware.graphicsCards 在 Windows 上会读取注册表中显示适配器的类键，
+        // 而该键会为安装过的每块显卡保留一条"幽灵"记录——即使显卡已被移除，导致
+        // "已安装的GPU"卡片在只有一块显卡时也会列出多块。这里在后台线程刷新当前在位的
+        // PnP 显示设备集合，只保留匹配的显卡。若在位集合为空（非 Windows 或查询失败），
+        // 则回退到 OSHI 的完整列表，而不是隐藏显卡。
         val nowNanos = System.nanoTime()
         if (nowNanos - gpuPresentRefreshNanos > GPU_PRESENT_REFRESH_INTERVAL_NANOS) {
             gpuPresentRefreshNanos = nowNanos
@@ -601,7 +588,7 @@ object SystemInfoProvider {
             presentGpuNames.isEmpty() || presentGpuNames.any { present -> gpuNamesMatch(gpu.model, present) }
         }
 
-        // Disks: map fileStores to diskStores via partition mount points (avoid external commands)
+        // 磁盘：通过分区挂载点将 fileStores 映射到 diskStores（避免调用外部命令）
         val fileStores = si.operatingSystem.fileSystem.fileStores
         val diskStores = hardware.diskStores
 
@@ -621,10 +608,10 @@ object SystemInfoProvider {
 
             val mount = fs.mount ?: ""
             val driveLetter = if (mount.length >= 2 && mount[1] == ':') {
-                // Windows drive letter
+                // Windows 盘符
                 if (mount.length == 2 || (mount.length == 3 && mount[2] == '\\')) mount.take(2) else "未指定盘符"
             } else {
-                // Linux/macOS: use mount point or device name
+                // Linux/macOS：使用挂载点或设备名
                 if (mount.isNotBlank()) {
                     if (mount == "/") "Root" else mount.split("/").lastOrNull() ?: mount
                 } else {
@@ -661,10 +648,10 @@ object SystemInfoProvider {
         )
     }
 
-    // ---- Services (processes & logged-in users) ----
-    // OSHI's processCount and sessions are memory-level queries, but to keep
-    // this absolutely non-blocking we still cache them and refresh at most
-    // every 5 seconds (well within the 1s UI tick without blocking calls).
+    // ---- 服务（进程与登录用户）----
+    // OSHI 的 processCount 与 sessions 都是内存级查询，但为确保绝对非阻塞，
+    // 这里仍然缓存结果并最多每 5 秒刷新一次（远低于 1 秒的 UI 心跳，
+    // 且不会产生阻塞调用）。
     @Volatile
     private var cachedProcessCount: Int = -1
     @Volatile
@@ -693,9 +680,9 @@ object SystemInfoProvider {
         )
     }
 
-    // ---- Battery ----
-    // OSHI's powerSources is a memory-level query (no subprocess), but we still
-    // cache it and refresh at most every 5s to guarantee zero UI blocking.
+    // ---- 电池 ----
+    // OSHI 的 powerSources 是内存级查询（无子进程），但仍缓存结果并最多每 5 秒
+    // 刷新一次，以保证 UI 零阻塞。
     @Volatile
     private var cachedHasBattery: Boolean = false
     @Volatile
@@ -758,28 +745,25 @@ object SystemInfoProvider {
 
                 if (ps != null) {
                     cachedHasBattery = true
-                    // Charging state: on AC (powerOnLine) and/or actively charging.
-                    // isCharging can be unreliable on some platforms, so combine
-                    // it with powerOnLine for a more robust detection.
+                    // 充电状态：已接交流电（powerOnLine）和/或正在充电。
+                    // isCharging 在部分平台上不可靠，故与 powerOnLine 结合以获得更稳健的判定。
                     cachedIsCharging = ps.isPowerOnLine || ps.isCharging
-                    // OSHI's remainingCapacityPercent is a fraction in [0.0, 1.0].
-                    // HOWEVER on Windows it is computed solely from SystemBatteryState
-                    // (CallNtPowerInformation): it defaults to 1.0 when the call fails,
-                    // and Windows usually reports remainingCapacity == maxCapacity (or
-                    // maxCapacity == 0 → Infinity, capped to 1.0), so it is stuck at 100%.
-                    // The accurate values read via DeviceIoControl (BATTERY_STATUS.Capacity
-                    // / BATTERY_INFORMATION.FullChargedCapacity) are exposed as
-                    // currentCapacity/maxCapacity in the SAME units, so derive the
-                    // percentage from their ratio, keeping remainingCapacityPercent as a
-                    // cross-platform fallback when the capacities are unavailable.
+                    // OSHI 的 remainingCapacityPercent 是 [0.0, 1.0] 区间内的小数。
+                    // 但在 Windows 上它仅由 SystemBatteryState（CallNtPowerInformation）计算：
+                    // 调用失败时默认为 1.0，且 Windows 通常报告 remainingCapacity == maxCapacity
+                    // （或 maxCapacity == 0 → Infinity，被截断为 1.0），导致该值恒为 100%。
+                    // 通过 DeviceIoControl 读取的准确值（BATTERY_STATUS.Capacity /
+                    // BATTERY_INFORMATION.FullChargedCapacity）以 currentCapacity/maxCapacity
+                    // 暴露，且单位相同，因此用二者之比推导百分比，并在容量不可用时
+                    // 以 remainingCapacityPercent 作为跨平台兜底。
                     val maxCap = ps.maxCapacity.toDouble()
                     val curCap = ps.currentCapacity.toDouble()
                     val frac = if (maxCap > 0 && curCap >= 0) curCap / maxCap else ps.remainingCapacityPercent
                     cachedCapacityPercent = if (frac in 0.0..1.0) frac * 100.0 else frac
                     cachedCapacityPercent = cachedCapacityPercent.coerceIn(0.0, 100.0)
                     cachedCycleCount = ps.cycleCount.takeIf { it >= 0 } ?: 0
-                    // PowerSource has no health field; estimate health from cycle
-                    // count (more cycles → more degraded battery).
+                    // PowerSource 没有健康度字段，故用循环次数估算
+                    // （循环次数越多，电池损耗越大）。
                     cachedHealthStatus = when {
                         cachedCycleCount <= 0 -> "未知"
                         cachedCycleCount < 300 -> "良好"
@@ -802,9 +786,9 @@ object SystemInfoProvider {
         )
     }
 
-    // ---- Screen ----
-    // Use java.awt memory-level APIs (no subprocess, no blocking). Resolution and
-    // scale are read from the toolkit; a 5s cache avoids re-querying every tick.
+    // ---- 屏幕 ----
+    // 使用 java.awt 的内存级 API（无子进程、无阻塞）。分辨率与缩放比例从
+    // toolkit 读取；5 秒缓存可避免每次心跳都重新查询。
     @Volatile
     private var cachedResolution: String = "未知"
     @Volatile
@@ -818,9 +802,8 @@ object SystemInfoProvider {
             try {
                 val gd = java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment()
                     .defaultScreenDevice
-                // getDisplayMode() returns the physical/native display mode
-                // (not affected by OS scaling). bounds would give the logical,
-                // scaled-down resolution — the user wants the hardware one.
+                // getDisplayMode() 返回物理 / 原生显示模式（不受系统缩放影响）。
+                // bounds 返回的是逻辑（缩放后）分辨率——而此处需要的是硬件分辨率。
                 val mode = gd.displayMode
                 cachedResolution = "${mode.width}x${mode.height}"
             } catch (_: Exception) {
@@ -840,12 +823,11 @@ object SystemInfoProvider {
         )
     }
 
-    // ---- Bluetooth ----
-    // Detecting the bluetooth adapter model requires an OS subprocess query, which
-    // can block. To keep the UI non-blocking, we run it once on a background daemon
-    // thread and persist the result in memory: once detected, the adapter name is
-    // cached forever (no repeated subprocess calls). Only the adapter model is
-    // detected here; the connected-device count has been removed.
+    // ---- 蓝牙 ----
+    // 探测蓝牙适配器型号需要执行操作系统子进程查询，可能会阻塞。为保持 UI 非阻塞，
+    // 这里仅在后台守护线程中执行一次并将结果常驻内存：一旦探测到，适配器名称便
+    // 永久缓存（不再重复执行子进程）。此处只探测适配器型号；
+    // 已连接设备数量功能已移除。
     @Volatile
     private var cachedBluetoothHasAdapter: Boolean = false
     @Volatile
@@ -854,9 +836,8 @@ object SystemInfoProvider {
     private var bluetoothInitialized: Boolean = false
     private var bluetoothInFlight = false
 
-    // Runs the bluetooth adapter-model query once on a background daemon thread
-    // and persists the result in memory. After completion, bluetoothInitialized
-    // becomes true and no further detection is triggered.
+    // 在后台守护线程中执行一次蓝牙适配器型号查询并将结果常驻内存。完成后
+    // bluetoothInitialized 置为 true，不再触发后续探测。
     private fun refreshBluetoothAsync() {
         if (bluetoothInFlight || bluetoothInitialized) return
         bluetoothInFlight = true
@@ -864,8 +845,8 @@ object SystemInfoProvider {
             try {
                 val os = System.getProperty("os.name").lowercase()
                 if (os.contains("windows")) {
-                    // Windows: query PnP devices for the bluetooth adapter model.
-                    // Use executeCommandUtf8 so the device name decodes correctly (no 乱码).
+                    // Windows：查询 PnP 设备以获取蓝牙适配器型号。
+                    // 使用 executeCommandUtf8，确保设备名正确解码（不出现乱码）。
                     val out = executeCommandUtf8(
                         "Get-PnpDevice -Class Bluetooth | Where-Object { \$PSItem.Status -eq 'OK' } | Select-Object -First 1 -ExpandProperty FriendlyName"
                     )
@@ -877,7 +858,7 @@ object SystemInfoProvider {
                         cachedBluetoothHasAdapter = false
                     }
                 } else if (os.contains("linux")) {
-                    // Linux: use hciconfig to detect the adapter model.
+                    // Linux：使用 hciconfig 探测适配器型号。
                     val hci = executeCommand("hciconfig -a 2>/dev/null | head -1")
                     if (hci.contains("hci")) {
                         cachedBluetoothHasAdapter = true
@@ -898,8 +879,8 @@ object SystemInfoProvider {
     }
 
     fun getBluetooth(): BluetoothInfo {
-        // Only trigger detection once; afterwards the cached values are reused
-        // forever (persisted in memory, no repeated subprocess queries).
+        // 只触发一次探测；此后永久复用缓存值
+        // （常驻内存，不再重复执行子进程查询）。
         if (!bluetoothInitialized) {
             refreshBluetoothAsync()
         }
@@ -936,12 +917,9 @@ object SystemInfoProvider {
     }
 
     /**
-     * 采集一次全部系统信息。
+     * 采集一次系统快照。
      * **必须在后台线程调用**（首次调用会触发 OSHI 初始化）。
      * 首次采集时会逐步上报"当前正在获取的项目"，供加载占位显示。
-     */
-    /**
-     * 采集一次系统快照。
      *
      * @param waitForInitialData 是否等待首页的冷启动数据（首次采集时可能会阻塞数秒，
      *   并占用加载进度文案）。首页轮询用默认的 true；AI 助手等后台调用传 false，
@@ -1005,7 +983,7 @@ object SystemInfoProvider {
             wallpaperPath = java.io.File("cardbg", customFileName).absolutePath
         } else if (!config.WallpaperState.useDefaultWallpaper()) {
             if (currentOs.contains("windows")) {
-                // Windows: check registry
+                // Windows：读取注册表
                 try {
                     val reg = executeCommand("reg query \"HKCU\\Control Panel\\Desktop\" /v WallPaper")
                     val line = reg.split("\n").firstOrNull { it.contains("WallPaper", ignoreCase = true) }
@@ -1030,9 +1008,7 @@ object SystemInfoProvider {
     }
 }
 
-// ============================================================================
-// 后台采集：与 UI 线程解耦
-// ============================================================================
+// ============ 后台采集：与 UI 线程解耦 ============
 
 /** 一次采集得到的全部系统信息（不可变快照） */
 data class SystemSnapshot(

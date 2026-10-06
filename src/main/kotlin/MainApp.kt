@@ -97,7 +97,7 @@ fun main() = application {
         // 工具页的一级标签（0=联机 / 1=本地），提升到此处以便 TopBar 根据它隐藏按钮
         var toolSourceTab by remember { mutableStateOf(0) }
 
-        // load persisted settings
+        // 加载已持久化的设置
         val loaded = loadConfig()
         var isDark by remember { mutableStateOf(loaded.dark) }
         var seedHex by remember { mutableStateOf(loaded.color) }

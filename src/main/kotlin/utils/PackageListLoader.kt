@@ -56,6 +56,7 @@ object PackageListLoader {
     
     /**
      * 从远程拉取包列表
+     *
      * @param manager 包管理器类型
      * @param proxyUrl 可选的 GitHub 代理地址（如 https://ghproxy.net 或自定义）
      * @return Result，成功包含包列表，失败包含错误信息

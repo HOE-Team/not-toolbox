@@ -138,7 +138,7 @@ object LlmClient {
         }
     }
 
-    // ---------- 请求体与响应解析 ----------
+    // ---- 请求体与响应解析 ----
 
     private fun buildBody(model: AiModelConfig, messages: List<LlmMessage>, stream: Boolean): String {
         val array = buildJsonArray {

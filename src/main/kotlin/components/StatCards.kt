@@ -63,7 +63,7 @@ fun StatCard(
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
-            // Title row: (optional) icon + title text
+            // 标题行：（可选）图标 + 标题文本
             Row(
                 modifier = Modifier.padding(bottom = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -170,7 +170,7 @@ fun RAMStatCard(
                         text = String.format(Locale.getDefault(), "占用: %.2f / %.2f GB", used, total),
                         style = MaterialTheme.typography.bodySmall
                     )
-                        // Removed textual percentage; percentage remains inside circular indicator
+                        // 已移除文本百分比；百分比仅在环形指示器内显示
                 }
             }
         }
@@ -188,14 +188,14 @@ fun GPUStatCard(
         icon = MaterialSymbols.DeveloperBoard,
         content = {
             if (gpus.isEmpty()) {
-                // No GPU installed
+                // 未安装显卡
                 Text(
                     text = "无GPU被安装或驱动程序未安装",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else if (gpus.size == 1) {
-                // Single GPU - show only model name
+                // 单块显卡：只显示型号名称
                 val gpu = gpus[0]
                 Column(
                     modifier = Modifier.fillMaxWidth(),
@@ -208,7 +208,7 @@ fun GPUStatCard(
                     )
                 }
             } else {
-                // Multiple GPUs - show all model names
+                // 多块显卡：显示全部型号名称
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -339,14 +339,14 @@ fun NetworkAdapterCard(
         icon = connectionIcon,
         content = {
             Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                // WiFi SSID (if connected to a wireless network)
+                // WiFi SSID（若已连接无线网络）
                 if (!network.ssid.isNullOrBlank()) {
                     Text(
                         text = "WiFi: ${network.ssid}",
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
-                // Cellular operator (if connected via LTE/cellular)
+                // 蜂窝运营商（若通过 LTE/蜂窝网络连接）
                 if (network.connectionType == utils.NetworkConnectionType.CELLULAR && !network.operatorName.isNullOrBlank()) {
                     Text(
                         text = "运营商: ${network.operatorName}",
@@ -554,7 +554,7 @@ fun NetworkAdaptersCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
-                // Collapse when there are more than this many items.
+                // 当条目数超过该值时折叠。
                 val visibleLimit = 4
                 var expanded by remember { mutableStateOf(false) }
                 val shown = if (expanded) list else list.take(visibleLimit)
@@ -570,7 +570,7 @@ fun NetworkAdaptersCard(
                         )
                     }
 
-                    // Expand / collapse toggle (only when there are extra items).
+                    // 展开 / 折叠开关（仅在存在多余条目时显示）。
                     if (list.size > visibleLimit) {
                         Text(
                             text = if (expanded) "收起" else "展开全部（${list.size}）",

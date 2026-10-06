@@ -38,10 +38,10 @@ fun adjustLuminance(color: Color, factor: Float): Color {
     return Color(r, g, b, color.alpha)
 }
 
-// HSL conversion helpers for Material 3 "tone" mapping.
-// A color role keeps its hue & chroma but is placed on a different tone
-// (lightness) per theme: dark themes lighten accents (Tone 80) and darken
-// containers (Tone 30), mirroring light themes' Tone 40 / Tone 90.
+// 用于 Material 3「色阶（tone）」映射的 HSL 转换辅助函数。
+// 同一颜色角色保持色相与彩度不变，但按主题置于不同的色阶（明度）：
+// 深色主题提亮强调色（色阶 80）并压暗容器色（色阶 30），
+// 对应浅色主题的色阶 40 / 90。
 private data class HSL(val hue: Float, val sat: Float, val light: Float)
 
 private fun Color.toHsl(): HSL {
@@ -102,10 +102,9 @@ fun contrastColor(color: Color): Color {
 }
 
 fun generateColorScheme(seed: Color, dark: Boolean) = if (dark) {
-    // Material 3 dark scheme via tone mapping: the same color roles keep their
-    // hue & chroma but move to different tones than light mode. Accents go to
-    // Tone 80 (lighter, for contrast on dark surfaces), containers drop to
-    // Tone 30 (darker), and text on containers goes to Tone 90.
+    // 通过色阶映射构建 Material 3 深色方案：同一颜色角色保持色相与彩度，
+    // 但使用与浅色模式不同的色阶。强调色取色阶 80（更亮，以便在深色表面上有
+    // 足够对比度），容器色降到色阶 30（更暗），容器上的文字取色阶 90。
     val primaryTone80 = toneOf(seed, 80f)
     val primaryContainerTone30 = toneOf(seed, 30f)
     val secondaryTone80 = toneOf(seed, 80f)
@@ -115,9 +114,9 @@ fun generateColorScheme(seed: Color, dark: Boolean) = if (dark) {
 
     darkColorScheme().copy(
         primary = primaryTone80,
-        // Tone-80 accents are light; on-colors use tone-20 in the same hue
-        // (e.g. deep purple on light purple) instead of a stark pure black,
-        // matching M3 on-color contrast (see #D0BCFF / #371E73).
+        // 色阶 80 的强调色偏亮，因此其前景色采用同色相的色阶 20
+        // （如浅紫上的深紫），而非生硬的纯黑，
+        // 以符合 M3 的前景色对比度（参见 #D0BCFF / #371E73）。
         onPrimary = toneOf(seed, 20f),
         primaryContainer = primaryContainerTone30,
         onPrimaryContainer = toneOf(seed, 90f),

@@ -30,9 +30,7 @@ data class InstalledPackageEntry(
     val version: String? = null
 )
 
-/**
- * 某个包管理器的扫描结果（全量已安装集合）。
- */
+/** 某个包管理器的扫描结果（全量已安装集合）。 */
 @Serializable
 data class InstalledManagerScan(
     val scannedAt: Long = 0L,
@@ -53,9 +51,7 @@ data class InstalledPackagesFile(
 private val installedPackagesPath: Path = Path.of("config", "installed_packages.json")
 private val installedPackagesJson = Json { ignoreUnknownKeys = true; prettyPrint = true; encodeDefaults = true }
 
-/**
- * 当前平台标识：windows / linux / other。
- */
+/** 当前平台标识：windows / linux / other。 */
 fun currentPlatformName(): String {
     val os = System.getProperty("os.name").lowercase()
     return when {
@@ -92,9 +88,7 @@ fun loadInstalledPackages(): InstalledPackagesFile {
     }
 }
 
-/**
- * 原子写入已安装包快照（先写临时文件再移动，避免中断导致文件损坏）。
- */
+/** 原子写入已安装包快照（先写临时文件再移动，避免中断导致文件损坏）。 */
 fun saveInstalledPackages(file: InstalledPackagesFile) {
     try {
         val dir = installedPackagesPath.parent

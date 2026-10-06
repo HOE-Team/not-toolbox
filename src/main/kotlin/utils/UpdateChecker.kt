@@ -176,9 +176,7 @@ object UpdateChecker {
     }
 }
 
-// ============================================================================
-// 检查实现（每个包管理器一次批量命令）
-// ============================================================================
+// ============ 检查实现（每个包管理器一次批量命令） ============
 
 private val isWindowsHost: Boolean by lazy {
     System.getProperty("os.name").lowercase().contains("windows")
@@ -246,9 +244,7 @@ private fun UpdateCommandResult?.accept(vararg expected: Int): UpdateCommandResu
 }
 
 
-// ============================================================================
-// 输出解析
-// ============================================================================
+// ============ 输出解析 ============
 
 /**
  * `winget upgrade --include-unknown`（列格式 `Name Id Version Available Source`）。

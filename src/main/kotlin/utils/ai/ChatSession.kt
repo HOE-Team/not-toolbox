@@ -21,9 +21,6 @@ import kotlinx.coroutines.withContext
 /** 对话过程中推送给界面的事件（只有三种，界面无需理解任何时序） */
 sealed class ChatEvent {
     /**
-     * 本轮助手回答的最新全貌：正文 + 线性时间线分段。
-     * 界面拿到后整份替换即可（分段是不可变的，复制列表很便宜）。
-     *
      * @param firstChunkMs 本轮请求发出到**首个分块**的毫秒数（0 表示还没收到任何分块）
      * @param chunks 本轮已收到的分块数（用于区分「服务端没在分块」与「在分块但很慢」）
      */
@@ -184,7 +181,7 @@ class ChatSession(
         chunks++
     }
 
-    // ---------- 一轮对话 ----------
+    // ---- 一轮对话 ----
 
     private suspend fun runTurn(userText: String, emit: (ChatEvent) -> Unit) = withContext(Dispatchers.IO) {
         turnMutex.withLock {
@@ -328,7 +325,7 @@ class ChatSession(
         }
     }
 
-    // ---------- 时间线维护 ----------
+    // ---- 时间线维护 ----
 
     /** 追加一段思考增量：最后一段思考还没封口就续写，已封口则新起一段 */
     private fun pushThinking(delta: String) {

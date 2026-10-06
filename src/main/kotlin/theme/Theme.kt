@@ -13,8 +13,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.MaterialTheme
 
 /**
- * AppTheme wraps MaterialTheme and builds a color scheme from a HEX seed color.
- * If seedHex is null or invalid, falls back to default Material colors.
+ * AppTheme 封装 MaterialTheme，并根据十六进制种子色构建配色方案。
+ * 当 seedHex 为 null 或非法时，回退到默认 Material 配色。
  */
 @Composable
 fun AppTheme(darkTheme: Boolean, seedHex: String?, content: @Composable () -> Unit) {

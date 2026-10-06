@@ -226,6 +226,6 @@ fun saveConfig(cfg: AppConfig) {
         Files.writeString(tmp, sb.toString())
         Files.move(tmp, configPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
     } catch (e: Exception) {
-        // ignore write errors for now
+        // 暂时忽略写入错误
     }
 }

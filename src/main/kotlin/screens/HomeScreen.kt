@@ -82,10 +82,9 @@ private fun HomeContent(snapshot: SystemSnapshot) {
     val bluetooth = snapshot.bluetooth
 
     // Masonry-style adaptive layout ("补位原则" / true shortest-column packing):
-    // column count derives from the available width. Each card is measured with
-    // its real rendered height, then placed into the column that currently has
-    // the least accumulated height (the largest gap), producing a waterfall
-    // arrangement without any estimated-height guesswork.
+    // 列数由可用宽度推导。每张卡片以其真实渲染高度测量，随后放入当前累计高度
+    // 最小（即空隙最大）的列中，从而形成瀑布流布局，
+    // 无需任何估算高度的猜测。
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
@@ -96,8 +95,8 @@ private fun HomeContent(snapshot: SystemSnapshot) {
             .toInt()
             .coerceAtLeast(1)
 
-        // The actual cards to render. buildList preserves the @Composable context
-        // for every lambda, and the battery card is appended only when present.
+        // 实际要渲染的卡片。buildList 为每个 lambda 保留 @Composable 上下文，
+        // 且仅当存在电池时才追加电池卡片。
         val items: List<@Composable () -> Unit> = buildList {
             add {
                 CPUStatCard(
@@ -167,7 +166,7 @@ private fun HomeContent(snapshot: SystemSnapshot) {
                     modifier = Modifier.fillMaxWidth()
                 )
             }
-            // Show the bluetooth card only if an adapter is detected.
+            // 仅在探测到适配器时显示蓝牙卡片。
             if (bluetooth.hasAdapter) {
                 add {
                     BluetoothStatCard(
@@ -183,15 +182,15 @@ private fun HomeContent(snapshot: SystemSnapshot) {
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
         ) {
-            // System overview spans the full width.
+            // 系统概览占满整行宽度。
             SystemOverviewCard(
                 overview = systemOverview,
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(spacing))
 
-            // True masonry: measure each card, then fill the current shortest column.
-            // spacingPx uses a fixed pixel value (matches 8.dp at density 1.0).
+            // 真正的瀑布流：先测量每张卡片，再填入当前最短的列。
+            // spacingPx 使用固定像素值（密度为 1.0 时对应 8.dp）。
             ColumnMasonry(
                 columns = columns,
                 spacingPx = 8,
@@ -203,10 +202,9 @@ private fun HomeContent(snapshot: SystemSnapshot) {
 }
 
 /**
- * A masonry (waterfall) layout that strictly follows the "fill the largest gap"
- * rule. Every card is measured with its real height and then placed into the
- * column that currently has the smallest accumulated height (the tallest gap
- * is filled first → cards always snap into the shortest column).
+ * 严格遵循"填入最大空隙"规则的瀑布流布局。
+ * 每张卡片以真实高度测量，随后放入当前累计高度最小
+ * （即空隙最大、优先填充）的列中，从而始终吸附到最短的列。
  */
 @Composable
 private fun ColumnMasonry(
@@ -218,14 +216,14 @@ private fun ColumnMasonry(
     SubcomposeLayout(modifier = modifier) { constraints ->
         val colWidth = (constraints.maxWidth - spacingPx * (columns - 1)) / columns
 
-        // Measure every card's real height under a fixed column width.
+        // 在固定列宽下测量每张卡片的真实高度。
         val placeables: List<Placeable> = items.mapIndexed { index, content ->
             subcompose(index, content).first().measure(
                 Constraints.fixedWidth(colWidth)
             )
         }
 
-        // Greedy shortest-column packing based on measured heights.
+        // 基于测量高度进行贪心式最短列填充。
         val colHeights = IntArray(columns)
         val colBuckets: List<MutableList<Placeable>> = List(columns) { mutableListOf() }
 
@@ -235,7 +233,7 @@ private fun ColumnMasonry(
             colHeights[target] += placeable.height + spacingPx
         }
 
-        // Layout at max width; height = tallest column (minus trailing spacing).
+        // 按最大宽度布局；高度 = 最高列（减去末尾间距）。
         val totalHeight = (colHeights.maxOrNull() ?: 0) - spacingPx
         layout(constraints.maxWidth, totalHeight.coerceAtLeast(0)) {
             val xOffsets = IntArray(columns) { it * (colWidth + spacingPx) }

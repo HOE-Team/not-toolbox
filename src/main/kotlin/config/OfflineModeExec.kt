@@ -81,7 +81,7 @@ private fun saveOfflineItems(items: List<OfflineItem>) {
         Files.writeString(tmp, json.encodeToString(OfflineListWrapper(items)))
         Files.move(tmp, listConfigPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
     } catch (e: Exception) {
-        // ignore write errors for now
+        // 暂时忽略写入错误
     }
 }
 

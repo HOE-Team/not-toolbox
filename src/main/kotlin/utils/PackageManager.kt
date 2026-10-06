@@ -96,19 +96,15 @@ data class PackageInfo(
     }
 }
 
-/**
- * 包管理器工具类
- */
+/** 包管理器工具类 */
 object PackageManagerUtils {
-    /**
-     * 检测当前系统的包管理器
-     */
     /** 进程级缓存：避免工具页多张卡片、多个页面各自 spawn 子进程重复检测 */
     @Volatile
     private var cachedPackageManager: PackageManagerType? = null
 
     /**
      * 检测当前系统的包管理器。
+     *
      * @param force true 时忽略进程内缓存重新检测（例如用户刚安装了新的包管理器）
      */
     fun detectPackageManager(force: Boolean = false): PackageManagerType {

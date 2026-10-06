@@ -19,9 +19,7 @@ import kotlinx.serialization.json.intOrNull
 /** 聊天消息发送方 */
 enum class ChatRole { USER, ASSISTANT }
 
-/**
- * 一次工具调用（由模型输出解析而来）。
- */
+/** 一次工具调用（由模型输出解析而来）。 */
 @Immutable
 data class ToolCall(
     val tool: String,

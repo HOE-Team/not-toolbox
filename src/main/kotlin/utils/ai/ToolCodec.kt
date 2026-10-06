@@ -236,7 +236,7 @@ object ToolCodec {
                     continue
                 }
                 // 没有完整行了：尾部若正好是一个已闭合的调用块也要结算
-                //（模型不保证在调用行后面补换行，参数一到齐就该把卡片建出来）
+                // （模型不保证在调用行后面补换行，参数一到齐就该把卡片建出来）
                 if (!settleCallBlock()) break
                 if (raw.length == settledUpTo) break
             }

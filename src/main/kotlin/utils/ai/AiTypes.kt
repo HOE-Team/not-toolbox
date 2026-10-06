@@ -37,9 +37,7 @@ enum class LlmProvider(
         resolveBaseUrl(custom).trimEnd('/') + "/chat/completions"
 }
 
-/**
- * 一个模型的配置。API Key 仅以密文（apiKeyEnc）落盘，见 SecretStore。
- */
+/** 一个模型的配置。API Key 仅以密文（apiKeyEnc）落盘，见 SecretStore。 */
 @Serializable
 data class AiModelConfig(
     val id: String = "",
@@ -64,9 +62,7 @@ data class AiModelConfig(
     val thinkingEnabled: Boolean = true
 )
 
-/**
- * AI 功能总配置（config/ai_config.json）。
- */
+/** AI 功能总配置（config/ai_config.json）。 */
 @Serializable
 data class AiAppConfig(
     val models: List<AiModelConfig> = emptyList(),

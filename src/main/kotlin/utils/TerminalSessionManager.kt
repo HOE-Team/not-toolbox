@@ -429,6 +429,7 @@ object TerminalSessionManager {
     /**
      * 执行命令并等待完成（直接启动进程，不通过交互式 Shell）。
      * 按 [toolCommandSessionMode] 路由到新会话或默认会话，并返回所用的会话 ID。
+     *
      * @param workingDirectory 进程工作目录；null 时使用当前 JVM 工作目录
      */
     fun executeCommandAndWait(command: String, workingDirectory: String? = null): Long {

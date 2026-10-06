@@ -122,8 +122,8 @@ fun SettingsScreen(
                     localDarkTheme = newValue
                     onThemeChange(newValue)
                 },
-                // M3 switch colors: on = primary track / onPrimary thumb,
-                // off = surfaceVariant track / onSurfaceVariant thumb.
+                // M3 开关配色：开启 = primary 轨道 / onPrimary 滑块，
+                // 关闭 = surfaceVariant 轨道 / onSurfaceVariant 滑块。
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
                     checkedTrackColor = MaterialTheme.colorScheme.primary,

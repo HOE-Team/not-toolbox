@@ -367,7 +367,7 @@ fun ToolsScreen(
                                 onDelete = { item -> deleteOfflineItem(item.id); offlineItems = loadOfflineItems() },
                                 onEdit = { item -> if (item.type == MOfflineEntryType.COMMAND) editCommandId = item.id }
                             )
-                            // Windows FAB Menu
+                            // Windows 悬浮操作按钮（FAB）菜单
                             Box(modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)) {
                                 if (isWindows) {
                                     Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.Bottom, modifier = Modifier.fillMaxSize()) {

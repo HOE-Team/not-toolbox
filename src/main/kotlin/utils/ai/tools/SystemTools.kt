@@ -70,7 +70,7 @@ object SystemTools {
         )
     )
 
-    // ---------- 实现 ----------
+    // ---- 实现 ----
 
     private suspend fun systemInfo(): ToolResult {
         val snap = systemSnapshotFlow.value ?: SystemInfoProvider.collectSnapshot(waitForInitialData = false)

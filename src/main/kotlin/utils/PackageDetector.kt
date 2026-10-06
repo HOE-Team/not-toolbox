@@ -177,6 +177,7 @@ object PackageDetector {
 
     /**
      * 实际执行检测；调用方必须已持有 [mutex]。
+     *
      * @param silent true 时不切换为 SCANNING（UI 不显示转圈）
      */
     private suspend fun detectLocked(manager: PackageManagerType, silent: Boolean = false) {
@@ -253,9 +254,7 @@ object PackageDetector {
     }
 }
 
-// ============================================================================
-// 扫描实现（优先零子进程的本地元数据读取）
-// ============================================================================
+// ============ 扫描实现（优先零子进程的本地元数据读取） ============
 
 private val isWindowsPlatform: Boolean by lazy {
     System.getProperty("os.name").lowercase().contains("windows")
@@ -582,9 +581,7 @@ private data class WingetPackage(
     @SerialName("Version") val version: String? = null
 )
 
-// ============================================================================
-// 批量命令执行（仅 RPM 系 / Winget / Nix 需要）
-// ============================================================================
+// ============ 批量命令执行（仅 RPM 系 / Winget / Nix 需要） ============
 
 /**
  * 一次性批量命令执行器。

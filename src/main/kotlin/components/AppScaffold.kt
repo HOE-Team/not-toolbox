@@ -44,10 +44,10 @@ fun AppScaffold(
         Scaffold() { paddingValues ->
             // fillMaxSize 确保宽高随窗口尺寸变化强制重排（修复 Linux 下缩放窗口显示面积不变）
             Row(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-                // Left rail occupies full height
+                // 左侧导航栏占满整个高度
                 Box(modifier = Modifier.fillMaxHeight()) { startBar() }
 
-                // Right side: TopBar at top, then content fills remaining space
+                // 右侧：顶部为 TopBar，下方内容填满剩余空间
                 Column(modifier = Modifier.fillMaxSize()) {
                     TopBar(title = topBarTitle, actions = topBarActions)
 

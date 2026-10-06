@@ -91,7 +91,7 @@ fun AboutScreen() {
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "版本：O-1.0.7-Snapshot-w40a",
+            text = "版本：O-1.0.7-RC1",
             style = MaterialTheme.typography.bodyMedium
         )
 
@@ -124,7 +124,7 @@ fun AboutScreen() {
         )
         Spacer(modifier = Modifier.height(12.dp))
 
-        // OSHI
+        // OSHI：系统信息库
         Text(
             text = "OSHI (系统信息获取工具)",
             style = MaterialTheme.typography.bodyLarge,
@@ -144,7 +144,7 @@ fun AboutScreen() {
         )
 
         Spacer(modifier = Modifier.height(16.dp))
-        // Compose Multi-Platform
+        // Compose Multi-Platform：声明式 UI 框架
         Text(
             text = "Compose Multi-Platform (声明式UI框架)",
             style = MaterialTheme.typography.bodyLarge,
@@ -253,7 +253,7 @@ fun AboutScreen() {
         )
 
         Spacer(modifier = Modifier.height(16.dp))
-        // Ktor
+        // Ktor：异步网络框架
         Text(
             text = "ktor (异步网络框架)",
             style = MaterialTheme.typography.bodyLarge,

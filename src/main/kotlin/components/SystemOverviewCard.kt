@@ -90,11 +90,11 @@ fun SystemOverviewCard(
                 )
             }
 
-            // Left (opaque) -> Right (transparent) overlay.
-            // Text sits on the left, so the left side is more opaque for readability,
-            // while the right side is more transparent to keep the wallpaper visible.
-            // matchParentSize: measured last, matches the parent Box's final size
-            // (fillMaxSize in a wrapContentHeight Box can resolve incorrectly).
+            // 从左（不透明）到右（透明）的遮罩。
+            // 文字位于左侧，因此左侧更不透明以保证可读性，
+            // 而右侧更透明以保留壁纸可见。
+            // matchParentSize：最后测量，可匹配父 Box 的最终尺寸
+            // （在 wrapContentHeight 的 Box 中使用 fillMaxSize 可能解析错误）。
             Box(modifier = Modifier
                 .matchParentSize()
                 .background(

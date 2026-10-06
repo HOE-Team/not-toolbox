@@ -128,7 +128,7 @@ object PackageTools {
         )
     )
 
-    // ---------- 只读 ----------
+    // ---- 只读 ----
 
     private suspend fun filterCatalog(
         env: ToolEnv,
@@ -274,7 +274,7 @@ object PackageTools {
         return ToolResult(sb.toString().trim())
     }
 
-    // ---------- 写操作（在此之前已由 ToolDispatcher 征得用户同意） ----------
+    // ---- 写操作（在此之前已由 ToolDispatcher 征得用户同意） ----
 
     /**
      * 安装 / 升级 / 卸载。
