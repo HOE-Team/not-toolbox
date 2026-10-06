@@ -4,7 +4,7 @@
 [Setup]
 AppId={{3189BC08-A081-436D-B344-A535CD722811}}
 AppName=NOT Toolbox
-AppVersion=1.0.7-snap-w40a
+AppVersion=1.0.7-RC1
 AppPublisher=HOE Team
 AppPublisherURL=https://hoe-team.github.io
 AppSupportURL=https://hoe-team.xyz/contact-us.html

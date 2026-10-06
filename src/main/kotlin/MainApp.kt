@@ -173,8 +173,8 @@ fun main() = application {
         val topBarTitle = when (selectedNavIndex) {
             1 -> "工具"
             2 -> "终端"
-            3 -> "设置"
-            4 -> "AI助手"
+            3 -> "AI助手"
+            4 -> "设置"
             5 -> "关于"
             else -> resolveGreeting(GreetingMode.fromName(greetingMode), displayName, customGreeting)
         }
@@ -249,7 +249,15 @@ fun main() = application {
                         onNavigateToTerminal = { selectedNavIndex = 2 }
                     )
                     2 -> TerminalScreen()
-                    3 -> SettingsScreen(
+                    3 -> AiScreen(
+                        state = aiChatState,
+                        selectedPackageManager = selectedPackageManager,
+                        useProxy = useProxy,
+                        proxyUrl = proxyUrl,
+                        isDebug = IS_DEBUG,
+                        onNavigateToTerminal = { selectedNavIndex = 2 }
+                    )
+                    4 -> SettingsScreen(
                         isDarkTheme = isDark,
                         onThemeChange = { newDark ->
                             isDark = newDark
@@ -322,14 +330,6 @@ fun main() = application {
                             TerminalSessionManager.setCloseSessionOnEnd(newVal)
                             persist()
                         }
-                    )
-                    4 -> AiScreen(
-                        state = aiChatState,
-                        selectedPackageManager = selectedPackageManager,
-                        useProxy = useProxy,
-                        proxyUrl = proxyUrl,
-                        isDebug = IS_DEBUG,
-                        onNavigateToTerminal = { selectedNavIndex = 2 }
                     )
                     5 -> AboutScreen()
                     else -> HomeScreen()
