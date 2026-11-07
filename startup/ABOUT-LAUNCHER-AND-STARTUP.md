@@ -4,7 +4,8 @@
 
 ### NTB 启动器(NTB Launcher)
 **概览**：  
-NTB 启动器用于校验二进制完整性、环境检查和使用 java -jar 指令启动NTB-all.jar  
+NTB 启动器用于基础 SHA256 完整性校验、环境检查，并使用 java -jar 指令启动 NTB-shrunk.jar。
+启动器不执行 GPG 签名校验；GPG 签名用于用户手动确认发布来源。
 
 **实现**：
 - 使用的语言：Python3
@@ -17,16 +18,18 @@ NTB 启动器用于校验二进制完整性、环境检查和使用 java -jar �
     import hashlib
     import os
     ```
-**关于复用**：  
-如果你更改了 NOT Toolbox 代码的内容并且希望复用 NOT Toolbox Launcher ，你需要修改文件中的 SHA256 校验和内容，您需要修改第 40 行的 expcted_hash 变量，具体如下：
-```python
-    # 计算 SHA256
-    calculated_hash = get_file_sha256(jar_path)
 
-    # 修改此处
-    expected_hash = "41F8227043D9FFCB40D20B58D9477AA870920E15E2D3C7A6863F37130FF5C334"
+**基础校验**：
+启动器读取 `binary_sha256.sha256` 并核对 `binary/NTB-shrunk.jar` 的 SHA256。
+开发构建可通过 `--skip-integrity` 或环境变量 `NTB_SKIP_INTEGRITY=1` 跳过。
+
+**GPG 签名**：
+发布签名文件为 `binary_sha256.sha256.asc`，公钥为 `res-py/GoldenHoe_pub.asc`。
+签名/校验使用跨平台的 `gpg` 命令；仓库不跟踪 `.ps1` 辅助脚本。
+```bash
+gpg --local-user <指纹> --armor --detach-sign --output binary_sha256.sha256.asc binary_sha256.sha256
+gpg --verify binary_sha256.sha256.asc binary_sha256.sha256
 ```
-你也可以删除代码中关于 SHA256 检验的代码来禁用校验。
 
 **NTB Launcher 授权信息**：  
 NTB Launcher 使用 [MIT License](../LICENSES/LICENSE-MIT-NTB-LAUNCHER) 开源  

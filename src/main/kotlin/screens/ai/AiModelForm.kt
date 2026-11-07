@@ -121,7 +121,11 @@ internal fun AiModelForm(
                 TextButton(onClick = onActivate) { Text("设为当前模型") }
             }
             Spacer(modifier = Modifier.width(8.dp))
-            Button(onClick = { onSave(draft) }, enabled = dirty) {
+            Button(
+                onClick = { onSave(draft) },
+                enabled = dirty,
+                shape = androidx.compose.foundation.shape.CircleShape
+            ) {
                 Icon(MaterialSymbols.Save, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
                 Text("保存")
@@ -135,7 +139,8 @@ internal fun AiModelForm(
             onValueChange = { draft = draft.copy(name = it) },
             label = { Text("显示名称") },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large
         )
 
         Spacer(modifier = Modifier.height(10.dp))
@@ -150,7 +155,8 @@ internal fun AiModelForm(
                 colors = ExposedDropdownMenuDefaults.textFieldColors(),
                 modifier = Modifier
                     .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = true)
-                    .fillMaxWidth()
+                    .fillMaxWidth(),
+                shape = MaterialTheme.shapes.large
             )
             ExposedDropdownMenu(expanded = providerExpanded, onDismissRequest = { providerExpanded = false }) {
                 LlmProvider.entries.forEach { provider ->
@@ -177,7 +183,8 @@ internal fun AiModelForm(
             label = { Text("模型名称") },
             placeholder = { Text("例如 gpt-4o-mini / deepseek-chat / qwen-plus") },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large
         )
 
         Spacer(modifier = Modifier.height(10.dp))
@@ -188,7 +195,8 @@ internal fun AiModelForm(
             label = { Text("Base URL（留空使用默认）") },
             placeholder = { Text(draft.provider.defaultBaseUrl.ifBlank { "https://example.com/v1" }) },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large
         )
 
         Spacer(modifier = Modifier.height(6.dp))
@@ -226,7 +234,8 @@ internal fun AiModelForm(
                     )
                 }
             },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large
         )
 
         Spacer(modifier = Modifier.height(4.dp))
@@ -245,7 +254,8 @@ internal fun AiModelForm(
             label = { Text("系统提示词（留空使用默认）") },
             minLines = 3,
             maxLines = 8,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large
         )
 
         Spacer(modifier = Modifier.height(6.dp))

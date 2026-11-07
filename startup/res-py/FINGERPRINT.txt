@@ -1,0 +1,4 @@
+﻿NOT Toolbox Release Signing Key
+Fingerprint: 4900 8F79 0CDB B34E C1D2 6A82 CE50 A883 DE74 5329
+Key ID: CE50A883DE745329
+Public key file: GoldenHoe_pub.asc

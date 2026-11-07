@@ -249,6 +249,16 @@ object SystemInfoProvider {
     private var wifiLastRefreshNanos = 0L
     private val WIFI_REFRESH_INTERVAL_NANOS = 10_000_000_000L  // every 10s
 
+    // 桌面壁纸路径缓存。getSystemOverview 会被每秒调用一次，若每次都启动
+    // reg.exe / PowerShell 查询注册表，既慢又容易在系统繁忙时超时回退。
+    // 这里缓存 15 秒；壁纸设置变化（开关或自定义文件）会通过 cacheKey 立即失效。
+    @Volatile
+    private var cachedWallpaperPath: String? = null
+    @Volatile
+    private var wallpaperCacheKey: String? = null
+    private var wallpaperLastRefreshNanos = 0L
+    private val WALLPAPER_REFRESH_INTERVAL_NANOS = 15_000_000_000L
+
     // 当前在位显卡显示名集合（仅 Windows）。
     // OSHI 的 hardware.graphicsCards 会读取注册表中显示适配器的类键，而该键会为
     // 机器上安装过的每块显卡保留一条"幽灵"记录——即使显卡已被物理移除。因此这里
@@ -970,41 +980,102 @@ object SystemInfoProvider {
 
         val computerName = try { java.net.InetAddress.getLocalHost().hostName } catch (_: Exception) { "Unknown" }
 
-        // 桌面壁纸路径决策：
-        // - 用户自选了本地图像（customBgFileName 非空）→ 使用 cardbg/ 下的该文件。
+        // 桌面壁纸路径决策（带 15 秒缓存）：
+        // - 用户自选了本地图像且当前允许使用自定义背景 → cardbg/ 下的该文件。
         // - 否则，若"不获取桌面壁纸"开启（Linux 上强制开启）→ 返回 null（走默认壁纸）。
-        // - Windows 且未开启"不获取桌面壁纸" → 尝试读取注册表获取真实壁纸。
-        var wallpaperPath: String? = null
-        val currentOs = System.getProperty("os.name").lowercase()
-        
-        // 优先：用户自选本地图像
-        val customFileName = config.WallpaperState.customBgFileName
-        if (!customFileName.isNullOrBlank()) {
-            wallpaperPath = java.io.File("cardbg", customFileName).absolutePath
-        } else if (!config.WallpaperState.useDefaultWallpaper()) {
-            if (currentOs.contains("windows")) {
-                // Windows：读取注册表
-                try {
-                    val reg = executeCommand("reg query \"HKCU\\Control Panel\\Desktop\" /v WallPaper")
-                    val line = reg.split("\n").firstOrNull { it.contains("WallPaper", ignoreCase = true) }
-                    if (line != null) {
-                        val parts = line.trim().split(Regex("\\s{2,}"))
-                        wallpaperPath = if (parts.size >= 3) parts[2] else line.trim().split(" ").lastOrNull()
-                    }
-                } catch (_: Exception) {
-                    wallpaperPath = null
-                }
-            }
-        }
-
+        // - Windows 且未开启"不获取桌面壁纸" → 读取注册表，失败时尝试当前主题的
+        //   TranscodedWallpaper。
         return SystemOverview(
             osVersion = osVersionStr,
             architecture = architecture,
             windowsUpdateStatus = "",
             platform = platformStr,
             computerName = computerName,
-            wallpaperPath = wallpaperPath
+            wallpaperPath = resolveWallpaperPath()
         )
+    }
+
+    /**
+     * 解析当前应使用的壁纸路径。
+     *
+     * 关键修复：
+     * 1. 注册表通过 UTF-8 PowerShell 读取，避免中文用户名/目录在 JDK 21 下被按
+     *    UTF-8 解码 GBK 输出而变成乱码，最终误判为"文件不存在"并回退默认壁纸。
+     * 2. 只有开启"不获取桌面壁纸"（Windows）时才优先使用本地自选图像；关掉后
+     *    会重新读取桌面壁纸，而不是继续使用残留的 customBgFileName。
+     * 3. 注册表路径失效时回退到 Windows 当前主题的 TranscodedWallpaper。
+     */
+    private fun resolveWallpaperPath(): String? {
+        val os = System.getProperty("os.name").lowercase()
+        val customFileName = config.WallpaperState.customBgFileName
+        val cacheKey = config.WallpaperState.useCustomBg.toString() + "|" +
+            (customFileName ?: "") + "|" + os
+        val now = System.nanoTime()
+        if (cacheKey == wallpaperCacheKey &&
+            now - wallpaperLastRefreshNanos < WALLPAPER_REFRESH_INTERVAL_NANOS
+        ) {
+            return cachedWallpaperPath
+        }
+
+        var resolved: String? = null
+        // Windows 上"使用本地图像"依附于"不获取桌面壁纸"开关；关闭开关后
+        // 即使 customBgFileName 还在，也应回到真实桌面壁纸。
+        val customAllowed = !customFileName.isNullOrBlank() &&
+            (config.WallpaperState.useCustomBg || os.contains("linux"))
+        if (customAllowed) {
+            val customFile = java.io.File("cardbg", customFileName)
+            if (customFile.isFile) {
+                resolved = customFile.absolutePath
+            }
+        }
+
+        if (resolved == null && !config.WallpaperState.useDefaultWallpaper()) {
+            if (os.contains("windows")) {
+                resolved = readWindowsWallpaperPath()
+            }
+        }
+
+        cachedWallpaperPath = resolved
+        wallpaperCacheKey = cacheKey
+        wallpaperLastRefreshNanos = now
+        return resolved
+    }
+
+    /** 读取 Windows 当前壁纸：注册表 WallPaper，失败时回退到 TranscodedWallpaper。 */
+    private fun readWindowsWallpaperPath(): String? {
+        try {
+            // 不让 PowerShell/reg.exe 的中文输出经过控制台编码：
+            // 由 PowerShell 直接读取注册表并返回 UTF-8 字节的 Base64。
+            // 这样中文用户名/图片目录不会因为 JDK 21 的 UTF-8 默认解码
+            // 与 cmd.exe 的 GBK 输出不一致而变成乱码。
+            val encoded = executeCommandUtf8(
+                "if (\$p = (Get-ItemProperty 'HKCU:\\Control Panel\\Desktop' -Name WallPaper -ErrorAction SilentlyContinue).WallPaper) " +
+                    "{ [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(\$p)) }"
+            )
+            val base64 = encoded.lineSequence().firstOrNull { it.isNotBlank() }?.trim()
+            if (!base64.isNullOrBlank()) {
+                val decoded = String(
+                    java.util.Base64.getDecoder().decode(base64),
+                    Charsets.UTF_8
+                ).trim().trim('"')
+                if (decoded.isNotBlank() && java.io.File(decoded).isFile) {
+                    return decoded
+                }
+            }
+        } catch (_: Exception) {
+        }
+
+        // 注册表路径可能为空（Windows 聚焦/幻灯片主题）或文件已移动；
+        // 当前主题渲染后的壁纸通常在这里。
+        try {
+            val appData = System.getenv("APPDATA")
+            if (!appData.isNullOrBlank()) {
+                val transcoded = java.io.File(appData, "Microsoft/Windows/Themes/TranscodedWallpaper")
+                if (transcoded.isFile) return transcoded.absolutePath
+            }
+        } catch (_: Exception) {
+        }
+        return null
     }
 }
 

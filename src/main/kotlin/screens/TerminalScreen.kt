@@ -7,21 +7,25 @@
 
 package screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import components.ExpressiveEmptyState
 import components.MaterialSymbols
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -125,28 +129,22 @@ fun TerminalScreen() {
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(
-                    text = "没有活跃的终端会话",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "按下“+”或下方按钮来创建一个会话",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Button(onClick = {
-                    TerminalSessionManager.createAndActivateSession()
-                }) {
-                    Icon(MaterialSymbols.Add, contentDescription = "新会话", modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("新会话")
+            ExpressiveEmptyState(
+                icon = MaterialSymbols.Terminal,
+                title = "没有活跃的终端会话",
+                message = "按下“+”或下方按钮来创建一个会话",
+                modifier = Modifier.widthIn(max = 460.dp),
+                actions = {
+                    Button(
+                        onClick = { TerminalSessionManager.createAndActivateSession() },
+                        shape = CircleShape
+                    ) {
+                        Icon(MaterialSymbols.Add, contentDescription = "新会话", modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("新会话")
+                    }
                 }
-            }
+            )
         }
     } else {
         Column(
@@ -155,49 +153,66 @@ fun TerminalScreen() {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-        // 标签页行：每个标签页内部带有各自的关闭按钮
-        PrimaryTabRow(
-            selectedTabIndex = activeIndex,
-            modifier = Modifier.fillMaxWidth()
+        // 标签页行：Expressive 胶囊标签，每个标签内部带有清空/关闭按钮
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             sessions.forEach { s ->
-                Tab(
-                    selected = s.id == activeId,
-                    onClick = { TerminalSessionManager.setActiveSession(s.id) },
-                    text = {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(s.title)
-                            // 右侧按钮区：清空输出按钮位于关闭按钮左边
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                // 清空该会话输出
-                                Icon(
-                                    MaterialSymbols.ClearAll,
-                                    contentDescription = "清空 ${s.title} 输出",
-                                    modifier = Modifier
-                                        .size(14.dp)
-                                        .clickable { TerminalSessionManager.clearOutput(s.id) }
-                                )
-                                // 默认会话不可关闭，其余会话显示关闭按钮
-                                if (!TerminalSessionManager.isDefaultSession(s.id)) {
-                                    Icon(
-                                        MaterialSymbols.Close,
-                                        contentDescription = "关闭 ${s.title} 会话",
-                                        modifier = Modifier
-                                            .size(14.dp)
-                                            .clickable { TerminalSessionManager.closeSession(s.id) }
-                                    )
-                                }
-                            }
+                val selected = s.id == activeId
+                Surface(
+                    shape = CircleShape,
+                    color = if (selected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerHigh
+                    },
+                    contentColor = if (selected) {
+                        MaterialTheme.colorScheme.onPrimary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    border = if (selected) null else BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+                    ),
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .clickable { TerminalSessionManager.setActiveSession(s.id) }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = s.title,
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1
+                        )
+                        // 清空该会话输出
+                        Icon(
+                            MaterialSymbols.ClearAll,
+                            contentDescription = "清空 ${s.title} 输出",
+                            modifier = Modifier
+                                .size(16.dp)
+                                .clickable { TerminalSessionManager.clearOutput(s.id) }
+                        )
+                        // 默认会话不可关闭，其余会话显示关闭按钮
+                        if (!TerminalSessionManager.isDefaultSession(s.id)) {
+                            Icon(
+                                MaterialSymbols.Close,
+                                contentDescription = "关闭 ${s.title} 会话",
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .clickable { TerminalSessionManager.closeSession(s.id) }
+                            )
                         }
                     }
-                )
+                }
             }
         }
 
@@ -206,9 +221,11 @@ fun TerminalScreen() {
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+            shape = MaterialTheme.shapes.extraLarge,
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
             colors = CardDefaults.cardColors(
-                containerColor = Color(0xFF1E1E1E) // 深色终端背景
+                containerColor = Color(0xFF1E1E1E) // 深色终端背景（保留终端自有的深色设计）
             )
         ) {
             Column(

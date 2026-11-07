@@ -41,3 +41,18 @@ replay_pid*
 
 # Local MCP server config (contains API keys / machine-specific paths)
 .mcp.json
+
+# GPG Keys
+/gpgkeys
+
+# Local backups
+/backup/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Generated release metadata (Get-Hash.bat / Sign-Release.ps1)
+/startup/binary_sha256.sha256
+/startup/binary_sha256.sha256.asc
+/startup/staging/

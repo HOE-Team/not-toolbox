@@ -101,62 +101,128 @@ fun contrastColor(color: Color): Color {
     return if (lum < 0.5f) Color(0xFFFFFFFF) else Color(0xFF000000)
 }
 
+/* -------------------------------------------------------------------------
+ * Material 3 Expressive 配色
+ *
+ * 与旧实现只做「同一色相 + 色阶」不同，这里按 M3 Expressive 的做法：
+ *  - primary 维持用户种子色相；
+ *  - secondary 偏移约 18°，作为柔和的中性强调；
+ *  - tertiary 偏移约 60°，作为高对比的「表达色」；
+ *  - 同时补齐 surfaceContainerLowest…Highest、surfaceDim/Bright 等容器色阶，
+ *    让页面可以用「同色系分层」而不是阴影来表达层级。
+ *
+ * 所有角色都由种子色推导，用户设置的 HEX 主题色仍然生效。
+ * ---------------------------------------------------------------------- */
+
+private fun toneColor(hueDeg: Float, sat: Float, tone: Float, alpha: Float = 1f): Color {
+    val h = ((hueDeg % 360f) + 360f) % 360f / 360f
+    return hslToColor(h, sat.coerceIn(0f, 1f), (tone / 100f).coerceIn(0f, 1f), alpha)
+}
+
+private fun containerTone(hueDeg: Float, sat: Float, tone: Float, alpha: Float = 1f): Color {
+    // 容器色保持低彩度：既看得出色相，又不会比内容更抢眼。
+    val soft = (sat * 0.55f).coerceIn(0f, 0.32f)
+    return toneColor(hueDeg, soft, tone, alpha)
+}
+
 fun generateColorScheme(seed: Color, dark: Boolean) = if (dark) {
-    // 通过色阶映射构建 Material 3 深色方案：同一颜色角色保持色相与彩度，
-    // 但使用与浅色模式不同的色阶。强调色取色阶 80（更亮，以便在深色表面上有
-    // 足够对比度），容器色降到色阶 30（更暗），容器上的文字取色阶 90。
-    val primaryTone80 = toneOf(seed, 80f)
-    val primaryContainerTone30 = toneOf(seed, 30f)
-    val secondaryTone80 = toneOf(seed, 80f)
-    val secondaryContainerTone30 = toneOf(seed, 30f)
-    val tertiaryTone80 = toneOf(seed, 80f)
-    val tertiaryContainerTone30 = toneOf(seed, 30f)
+    val hsl = seed.toHsl()
+    val hue = hsl.hue * 360f
+    val chroma = if (hsl.sat < 0.05f) hsl.sat else hsl.sat.coerceAtLeast(0.42f)
+    val secondaryHue = hue + 18f
+    val tertiaryHue = hue + 60f
+    val neutralSat = if (hsl.sat < 0.05f) 0f else 0.055f
+
+    val primary = toneColor(hue, chroma, 80f)
+    val secondary = toneColor(secondaryHue, chroma * 0.60f, 80f)
+    val tertiary = toneColor(tertiaryHue, chroma * 0.85f, 80f)
 
     darkColorScheme().copy(
-        primary = primaryTone80,
+        primary = primary,
         // 色阶 80 的强调色偏亮，因此其前景色采用同色相的色阶 20
-        // （如浅紫上的深紫），而非生硬的纯黑，
-        // 以符合 M3 的前景色对比度（参见 #D0BCFF / #371E73）。
-        onPrimary = toneOf(seed, 20f),
-        primaryContainer = primaryContainerTone30,
-        onPrimaryContainer = toneOf(seed, 90f),
-        secondary = secondaryTone80,
-        onSecondary = toneOf(seed, 20f),
-        secondaryContainer = secondaryContainerTone30,
-        onSecondaryContainer = toneOf(seed, 90f),
-        tertiary = tertiaryTone80,
-        onTertiary = toneOf(seed, 20f),
-        tertiaryContainer = tertiaryContainerTone30,
-        onTertiaryContainer = toneOf(seed, 90f),
-        background = Color(0xFF141218),
-        onBackground = Color(0xFFE6E1E5),
-        surface = Color(0xFF1D1B20),
-        onSurface = Color(0xFFE6E1E5),
-        surfaceVariant = Color(0xFF49454F),
-        onSurfaceVariant = Color(0xFFCAC4D0),
-        outline = Color(0xFF938F99),
-        outlineVariant = Color(0xFF49454F),
-        inverseSurface = Color(0xFFE6E1E5),
-        inverseOnSurface = Color(0xFF322F35),
-        inversePrimary = seed,
-        error = Color(0xFFF2B8B5),
-        onError = Color(0xFF601410),
-        errorContainer = Color(0xFF8C1D18),
-        onErrorContainer = Color(0xFFF9DEDC)
+        // （如浅紫上的深紫），而非生硬的纯黑。
+        onPrimary = toneColor(hue, chroma * 0.55f, 20f),
+        primaryContainer = containerTone(hue, chroma, 30f),
+        onPrimaryContainer = toneColor(hue, chroma * 0.55f, 90f),
+        inversePrimary = toneColor(hue, chroma, 40f),
+        secondary = secondary,
+        onSecondary = toneColor(secondaryHue, chroma * 0.40f, 20f),
+        secondaryContainer = containerTone(secondaryHue, chroma, 30f),
+        onSecondaryContainer = toneColor(secondaryHue, chroma * 0.45f, 90f),
+        tertiary = tertiary,
+        onTertiary = toneColor(tertiaryHue, chroma * 0.45f, 20f),
+        tertiaryContainer = containerTone(tertiaryHue, chroma, 30f),
+        onTertiaryContainer = toneColor(tertiaryHue, chroma * 0.50f, 90f),
+        background = toneColor(hue, neutralSat, 7f),
+        onBackground = toneColor(hue, neutralSat * 0.5f, 92f),
+        surface = toneColor(hue, neutralSat, 10f),
+        onSurface = toneColor(hue, neutralSat * 0.5f, 92f),
+        surfaceVariant = toneColor(hue, neutralSat * 1.8f, 30f),
+        onSurfaceVariant = toneColor(hue, neutralSat * 1.2f, 80f),
+        surfaceTint = primary,
+        surfaceDim = toneColor(hue, neutralSat, 6f),
+        surfaceBright = toneColor(hue, neutralSat, 24f),
+        surfaceContainerLowest = toneColor(hue, neutralSat, 4f),
+        surfaceContainerLow = toneColor(hue, neutralSat, 12f),
+        surfaceContainer = toneColor(hue, neutralSat, 16f),
+        surfaceContainerHigh = toneColor(hue, neutralSat, 20f),
+        surfaceContainerHighest = toneColor(hue, neutralSat, 24f),
+        outline = toneColor(hue, neutralSat * 1.4f, 60f),
+        outlineVariant = toneColor(hue, neutralSat * 2.0f, 30f),
+        inverseSurface = toneColor(hue, neutralSat * 0.5f, 90f),
+        inverseOnSurface = toneColor(hue, neutralSat * 0.5f, 20f),
+        error = Color(0xFFFFB4AB),
+        onError = Color(0xFF690005),
+        errorContainer = Color(0xFF93000A),
+        onErrorContainer = Color(0xFFFFDAD6)
     )
 } else {
-    // 浅色主题：保持原有配色；仅新增 NavRail 选中项背景(secondaryContainer)
-    // 和输入框/卡片背景(surfaceVariant)跟随主色，其余图标/字体着色角色不变。
+    val hsl = seed.toHsl()
+    val hue = hsl.hue * 360f
+    val chroma = if (hsl.sat < 0.05f) hsl.sat else hsl.sat.coerceAtLeast(0.42f)
+    val secondaryHue = hue + 18f
+    val tertiaryHue = hue + 60f
+    val neutralSat = if (hsl.sat < 0.05f) 0f else 0.05f
+
+    val primary = toneColor(hue, chroma, 40f)
+    val secondary = toneColor(secondaryHue, chroma * 0.60f, 40f)
+    val tertiary = toneColor(tertiaryHue, chroma * 0.85f, 40f)
+
     lightColorScheme(
-        primary = seed,
-        onPrimary = contrastColor(seed),
-        secondary = adjustLuminance(seed, 0.9f),
-        onSecondary = contrastColor(adjustLuminance(seed, 0.9f)),
-        secondaryContainer = containerColor(seed, 90f),
-        background = Color(0xFFFFFFFF),
-        onBackground = Color(0xFF000000),
-        surface = Color(0xFFFFFFFF),
-        onSurface = Color(0xFF000000),
-        surfaceVariant = containerColor(seed, 90f)
+        primary = primary,
+        onPrimary = contrastColor(primary),
+        primaryContainer = containerTone(hue, chroma, 90f),
+        onPrimaryContainer = toneColor(hue, chroma * 0.55f, 10f),
+        inversePrimary = toneColor(hue, chroma, 80f),
+        secondary = secondary,
+        onSecondary = contrastColor(secondary),
+        secondaryContainer = containerTone(secondaryHue, chroma, 90f),
+        onSecondaryContainer = toneColor(secondaryHue, chroma * 0.45f, 10f),
+        tertiary = tertiary,
+        onTertiary = contrastColor(tertiary),
+        tertiaryContainer = containerTone(tertiaryHue, chroma, 90f),
+        onTertiaryContainer = toneColor(tertiaryHue, chroma * 0.50f, 10f),
+        background = toneColor(hue, neutralSat, 99f),
+        onBackground = toneColor(hue, neutralSat * 0.5f, 10f),
+        surface = toneColor(hue, neutralSat, 99f),
+        onSurface = toneColor(hue, neutralSat * 0.5f, 10f),
+        surfaceVariant = toneColor(hue, neutralSat * 1.8f, 92f),
+        onSurfaceVariant = toneColor(hue, neutralSat * 1.2f, 30f),
+        surfaceTint = primary,
+        surfaceDim = toneColor(hue, neutralSat, 87f),
+        surfaceBright = toneColor(hue, neutralSat, 100f),
+        surfaceContainerLowest = toneColor(hue, neutralSat, 100f),
+        surfaceContainerLow = toneColor(hue, neutralSat, 97f),
+        surfaceContainer = toneColor(hue, neutralSat, 95f),
+        surfaceContainerHigh = toneColor(hue, neutralSat, 93f),
+        surfaceContainerHighest = toneColor(hue, neutralSat, 91f),
+        outline = toneColor(hue, neutralSat * 1.4f, 50f),
+        outlineVariant = toneColor(hue, neutralSat * 2.0f, 82f),
+        inverseSurface = toneColor(hue, neutralSat * 0.5f, 20f),
+        inverseOnSurface = toneColor(hue, neutralSat * 0.5f, 95f),
+        error = Color(0xFFBA1A1A),
+        onError = Color(0xFFFFFFFF),
+        errorContainer = Color(0xFFFFDAD6),
+        onErrorContainer = Color(0xFF410002)
     )
 }

@@ -11,6 +11,7 @@ package screens.ai
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,7 +20,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import components.ExpressiveEmptyState
 import components.MaterialSymbols
+import components.TonalIcon
 import kotlinx.coroutines.delay
 import utils.PackageManagerType
 import utils.PackageManagerUtils
@@ -44,6 +47,30 @@ fun AiScreen(
 ) {
     val listState = rememberLazyListState()
     var showModelDialog by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // 错误统一走 Snackbar：顶部状态条只保留非错误的 notice。
+    // errorText 由状态层写入，消费后清空，避免切页返回时重复弹出。
+    LaunchedEffect(state.errorText) {
+        val text = state.errorText ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(
+            message = text,
+            duration = SnackbarDuration.Long
+        )
+        if (state.errorText == text) state.errorText = null
+    }
+
+    // 消息级错误（流式请求失败 / 服务端返回 Failed）同样只用 Snackbar 呈现，
+    // 不再写进聊天气泡，也不使用警告符号前缀。
+    val latestMessageError = state.messages.lastOrNull()?.error
+    LaunchedEffect(latestMessageError, state.messages.lastOrNull()?.id) {
+        latestMessageError?.let {
+            snackbarHostState.showSnackbar(
+                message = it,
+                duration = SnackbarDuration.Long
+            )
+        }
+    }
 
     // 每次进入本页（含从其它页切回来）都落在最新一条：会话状态是应用级的，
     // 但 LazyColumn 的滚动位置随页面重建，不补这一步会从最开头显示
@@ -103,6 +130,7 @@ fun AiScreen(
         }
     }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Column(modifier = Modifier.fillMaxSize()) {
         val model = state.activeModel
         if (model == null) {
@@ -120,7 +148,7 @@ fun AiScreen(
                 onNewConversation = { state.startNewConversation() }
             )
 
-            HorizontalDivider()
+            Spacer(modifier = Modifier.height(6.dp))
             AiNotices(state)
 
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
@@ -140,8 +168,6 @@ fun AiScreen(
                 AiProgressRow(state)
             }
 
-            HorizontalDivider()
-
             AiInputBar(
                 value = state.input,
                 onValueChange = { state.input = it },
@@ -153,6 +179,26 @@ fun AiScreen(
                 onThinkingEnabledChange = { state.setThinkingEnabled(it) }
             )
         }
+    }
+
+    SnackbarHost(
+        hostState = snackbarHostState,
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(horizontal = 16.dp)
+            .padding(
+                top = 16.dp,
+                bottom = if (state.activeModel != null) 156.dp else 24.dp
+            )
+    ) { data ->
+        Snackbar(
+            snackbarData = data,
+            shape = MaterialTheme.shapes.large,
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+            actionColor = MaterialTheme.colorScheme.onErrorContainer
+        )
+    }
     }
 
     if (showModelDialog) {
@@ -173,17 +219,9 @@ fun AiScreen(
     }
 }
 
-/** 顶部提示条：错误与通知共用一套外观 */
+/** 顶部通知条：只展示非错误类 notice；错误由 Snackbar 承担 */
 @Composable
 private fun AiNotices(state: AiChatState) {
-    state.errorText?.let { text ->
-        AiNoticeRow(
-            text = text,
-            container = MaterialTheme.colorScheme.errorContainer,
-            content = MaterialTheme.colorScheme.onErrorContainer,
-            onDismiss = { state.errorText = null }
-        )
-    }
     state.notice?.let { text ->
         AiNoticeRow(
             text = text,
@@ -201,9 +239,15 @@ private fun AiNoticeRow(
     content: Color,
     onDismiss: () -> Unit
 ) {
-    Surface(color = container, modifier = Modifier.fillMaxWidth()) {
+    Surface(
+        color = container,
+        shape = MaterialTheme.shapes.large,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+    ) {
         Row(
-            modifier = Modifier.padding(start = 20.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+            modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
@@ -231,48 +275,62 @@ private fun AiTopBar(
     onOpenModelSettings: () -> Unit,
     onNewConversation: () -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = MaterialTheme.shapes.extraLarge,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        Icon(
-            imageVector = MaterialSymbols.Robot2,
-            contentDescription = null,
-            modifier = Modifier.size(22.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
-        Spacer(modifier = Modifier.width(10.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = modelName,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Medium
-            )
-            val detail = buildString {
-                if (providerName.isNotBlank()) append(providerName)
-                if (isNotEmpty()) append(" · ")
-                append(if (toolsEnabled) "工具已启用" else "未启用工具")
-                if (shellEnabled) append(" · 含终端命令")
-                if (busy) append(" · 正在生成")
-            }
-            Text(
-                text = detail,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        TextButton(onClick = onNewConversation, enabled = hasMessages) {
-            Icon(MaterialSymbols.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-            Spacer(modifier = Modifier.width(6.dp))
-            Text("新对话")
-        }
-        Button(
-            onClick = onOpenModelSettings,
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+        Row(
+            modifier = Modifier.padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(MaterialSymbols.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(6.dp))
-            Text("模型设置")
+            TonalIcon(
+                icon = MaterialSymbols.Robot2,
+                contentDescription = null,
+                size = 44.dp,
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = modelName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                val detail = buildString {
+                    if (providerName.isNotBlank()) append(providerName)
+                    if (isNotEmpty()) append(" · ")
+                    append(if (toolsEnabled) "工具已启用" else "未启用工具")
+                    if (shellEnabled) append(" · 含终端命令")
+                    if (busy) append(" · 正在生成")
+                }
+                Text(
+                    text = detail,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            FilledTonalButton(
+                onClick = onNewConversation,
+                enabled = hasMessages,
+                shape = CircleShape,
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+            ) {
+                Icon(MaterialSymbols.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("新对话")
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Button(
+                onClick = onOpenModelSettings,
+                shape = CircleShape,
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Icon(MaterialSymbols.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("模型设置")
+            }
         }
     }
 }
@@ -284,51 +342,27 @@ private fun AiTopBar(
  */
 @Composable
 private fun AiEmptyState(configured: Boolean, onAddModel: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        if (!configured) {
-            Icon(
-                imageVector = MaterialSymbols.BrightnessEmpty,
-                contentDescription = null,
-                modifier = Modifier.size(72.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(18.dp))
-            Text(text = "还没有配置任何模型", style = MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "添加一个 OpenAI 兼容的模型后即可开始对话。\n" +
-                    "API Key 会加密保存在 config/ai_config.json，不会明文落盘。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(20.dp))
-            Button(onClick = onAddModel) {
-                Icon(MaterialSymbols.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("添加一个模型")
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        ExpressiveEmptyState(
+            icon = if (configured) MaterialSymbols.Robot2 else MaterialSymbols.BrightnessEmpty,
+            title = if (configured) "可以开始提问了" else "还没有配置任何模型",
+            message = if (configured) {
+                "让它帮你操作包管理器、提供解决方案或是聊天。"
+            } else {
+                "添加一个 OpenAI 兼容的模型后即可开始对话。\n" +
+                    "API Key 会加密保存在 config/ai_config.json，不会明文落盘。"
+            },
+            modifier = Modifier.widthIn(max = 520.dp),
+            actions = if (configured) null else {
+                {
+                    Button(onClick = onAddModel, shape = CircleShape) {
+                        Icon(MaterialSymbols.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("添加一个模型")
+                    }
+                }
             }
-        } else {
-            Icon(
-                imageVector = MaterialSymbols.Robot2,
-                contentDescription = null,
-                modifier = Modifier.size(56.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(text = "可以开始提问了", style = MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "让它帮你操作包管理器、提供解决方案或是聊天。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-        }
+        )
     }
 }
 

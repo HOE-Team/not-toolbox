@@ -9,10 +9,12 @@
 
 package screens.ai
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -49,18 +51,23 @@ internal fun AiModelDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Surface(shape = RoundedCornerShape(16.dp), modifier = Modifier.width(960.dp).height(640.dp)) {
+        Surface(
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            modifier = Modifier.width(960.dp).height(640.dp)
+        ) {
             Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "AI 模型设置",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleLarge,
                         modifier = Modifier.weight(1f)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Button(
                         onClick = onDismiss,
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                        shape = CircleShape,
+                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp)
                     ) {
                         Icon(MaterialSymbols.Check, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
@@ -68,9 +75,7 @@ internal fun AiModelDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider()
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 Row(modifier = Modifier.weight(1f)) {
                     Column(modifier = Modifier.width(280.dp).fillMaxHeight()) {
@@ -85,7 +90,8 @@ internal fun AiModelDialog(
                                 onConfigChange(config.addModel(created))
                                 selectedId = created.id
                             },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            shape = CircleShape
                         ) {
                             Icon(MaterialSymbols.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
@@ -209,11 +215,20 @@ private fun AiModelListItem(
 ) {
     Surface(
         color = if (selected) {
-            MaterialTheme.colorScheme.secondaryContainer
+            MaterialTheme.colorScheme.primaryContainer
         } else {
-            MaterialTheme.colorScheme.surfaceVariant
+            MaterialTheme.colorScheme.surfaceContainerHigh
         },
-        shape = RoundedCornerShape(8.dp),
+        contentColor = if (selected) {
+            MaterialTheme.colorScheme.onPrimaryContainer
+        } else {
+            MaterialTheme.colorScheme.onSurface
+        },
+        shape = MaterialTheme.shapes.large,
+        border = if (selected) null else BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        ),
         modifier = Modifier.fillMaxWidth().clickable { onClick() }
     ) {
         Row(

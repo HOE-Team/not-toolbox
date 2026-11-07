@@ -12,6 +12,7 @@ package screens.ai
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
@@ -39,8 +40,8 @@ internal fun AiThinkingBlock(text: String, autoExpand: Boolean) {
     val accent = MaterialTheme.colorScheme.primary
 
     Surface(
-        color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = MaterialTheme.shapes.large,
         border = BorderStroke(1.dp, accent.copy(alpha = 0.35f)),
         modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp)
     ) {
@@ -60,12 +61,12 @@ internal fun AiThinkingBlock(text: String, autoExpand: Boolean) {
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                Surface(color = accent.copy(alpha = 0.12f), shape = RoundedCornerShape(6.dp)) {
+                Surface(color = accent.copy(alpha = 0.12f), shape = CircleShape) {
                     Text(
                         text = "思考过程",
                         style = MaterialTheme.typography.labelMedium,
                         color = accent,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     )
                 }
                 Spacer(modifier = Modifier.width(6.dp))
@@ -145,8 +146,8 @@ internal fun AiToolCallBlock(
     }
 
     Surface(
-        color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = MaterialTheme.shapes.large,
         border = BorderStroke(1.dp, accent.copy(alpha = 0.45f)),
         modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp)
     ) {
@@ -172,13 +173,13 @@ internal fun AiToolCallBlock(
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                Surface(color = accent.copy(alpha = 0.12f), shape = RoundedCornerShape(6.dp)) {
+                Surface(color = accent.copy(alpha = 0.12f), shape = CircleShape) {
                     Text(
                         text = segment.call.tool,
                         style = MaterialTheme.typography.labelMedium,
                         fontFamily = FontFamily.Monospace,
                         color = accent,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     )
                 }
                 if (isWrite) {
@@ -236,8 +237,8 @@ internal fun AiToolCallBlock(
                 if (segment.phase.isPending && segment.outputTail.isNotBlank()) {
                     Spacer(modifier = Modifier.height(6.dp))
                     Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        shape = MaterialTheme.shapes.medium,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
@@ -254,7 +255,7 @@ internal fun AiToolCallBlock(
                 if (segment.phase == ToolPhase.RUNNING && spec != null && spec.canContinue) {
                     Spacer(modifier = Modifier.height(8.dp))
                     // Material 3 的 Filled 按钮即默认 Button（主色填充容器）
-                    Button(onClick = onContinue) {
+                    Button(onClick = onContinue, shape = CircleShape) {
                         Text("在执行时继续")
                     }
                 }

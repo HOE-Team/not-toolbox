@@ -10,6 +10,7 @@
 package screens.ai
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -30,8 +31,13 @@ internal fun AiInputBar(
     thinkingSupported: Boolean,
     onThinkingEnabledChange: (Boolean) -> Unit
 ) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = MaterialTheme.shapes.extraLarge,
+        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp)
+    ) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 12.dp)
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
         // 思考开关只对支持 thinking 参数的提供商显示——否则是个「点了没用」的假开关
         if (thinkingSupported) {
@@ -61,24 +67,34 @@ internal fun AiInputBar(
                 },
                 placeholder = { Text("键入以发送（Enter 发送，Shift+Enter 换行）") },
                 maxLines = 6,
-                shape = RoundedCornerShape(12.dp),
+                shape = MaterialTheme.shapes.extraLarge,
                 textStyle = MaterialTheme.typography.bodyMedium
             )
             Spacer(modifier = Modifier.width(10.dp))
             if (busy) {
-                FilledTonalButton(onClick = onStop, modifier = Modifier.height(56.dp)) {
+                FilledTonalButton(
+                    onClick = onStop,
+                    modifier = Modifier.height(56.dp),
+                    shape = CircleShape
+                ) {
                     Icon(MaterialSymbols.Stop, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("停止")
                 }
             } else {
-                Button(onClick = onSend, enabled = value.isNotBlank(), modifier = Modifier.height(56.dp)) {
+                Button(
+                    onClick = onSend,
+                    enabled = value.isNotBlank(),
+                    modifier = Modifier.height(56.dp),
+                    shape = CircleShape
+                ) {
                     Icon(MaterialSymbols.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("发送")
                 }
             }
         }
+    }
     }
 }
 

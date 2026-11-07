@@ -7,6 +7,7 @@
 
 package components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -36,7 +37,8 @@ fun SystemOverviewCard(
         modifier = modifier
             .fillMaxWidth()
             .padding(bottom = 12.dp),
-        shape = RoundedCornerShape(8.dp)
+        shape = MaterialTheme.shapes.extraLarge,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
         Box(modifier = Modifier
             .fillMaxWidth()
@@ -111,12 +113,12 @@ fun SystemOverviewCard(
 
                 Column(modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(24.dp),
                     verticalArrangement = Arrangement.Top
                 ) {
                 Text(
                     text = "系统概览",
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(

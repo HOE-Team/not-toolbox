@@ -7,8 +7,11 @@
 
 package components
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,9 +20,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import theme.LocalWavyProgress
 import kotlin.math.roundToInt
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun CircularProgressIndicator(
     progress: Float,
@@ -32,21 +37,43 @@ fun CircularProgressIndicator(
         modifier = modifier.size(size.dp),
         contentAlignment = Alignment.Center
     ) {
-        CircularProgressIndicator(
-            progress = { progress / 100f },
-            modifier = Modifier.size(size.dp),
-            strokeWidth = strokeWidth.dp,
-            color = MaterialTheme.colorScheme.primary,
-            trackColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-        Text(
-            text = "${progress.roundToInt()}%",
-            style = MaterialTheme.typography.bodySmall,
-            fontSize = 12.sp
-        )
+        if (LocalWavyProgress.current) {
+            CircularWavyProgressIndicator(
+                progress = { progress / 100f },
+                modifier = Modifier.size(size.dp),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+            )
+        } else {
+            CircularProgressIndicator(
+                progress = { progress / 100f },
+                modifier = Modifier.size(size.dp),
+                strokeWidth = strokeWidth.dp,
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+            )
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "${progress.roundToInt()}%",
+                style = MaterialTheme.typography.titleSmall,
+                fontSize = 13.sp
+            )
+            if (label.isNotBlank()) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }
 
+/**
+ * Expressive 统计卡片：无阴影，使用 surfaceContainerLow + 细描边分层，
+ * 图标放进圆形图标井中，标题使用加粗的 titleMedium。
+ */
 @Composable
 fun StatCard(
     title: String,
@@ -58,28 +85,40 @@ fun StatCard(
         modifier = modifier
             .fillMaxWidth()
             .padding(8.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(20.dp)
         ) {
-            // 标题行：（可选）图标 + 标题文本
+            // 标题行：图标井 + 标题文本
             Row(
-                modifier = Modifier.padding(bottom = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.padding(bottom = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 if (icon != null) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
                 }
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
             content()
@@ -226,6 +265,7 @@ fun GPUStatCard(
     )
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun DiskStatCard(
     disks: List<utils.DiskInfo>,
@@ -243,10 +283,21 @@ fun DiskStatCard(
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Text(text = "${disk.name} - ${disk.model}", style = MaterialTheme.typography.bodySmall)
                         Spacer(modifier = Modifier.height(6.dp))
-                        LinearProgressIndicator(
-                            progress = { (disk.usage / 100.0).toFloat() },
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        if (LocalWavyProgress.current) {
+                            LinearWavyProgressIndicator(
+                                progress = { (disk.usage / 100.0).toFloat() },
+                                modifier = Modifier.fillMaxWidth(),
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                            )
+                        } else {
+                            LinearProgressIndicator(
+                                progress = { (disk.usage / 100.0).toFloat() },
+                                modifier = Modifier.fillMaxWidth(),
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                            )
+                        }
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = String.format(Locale.getDefault(), "%.2f GB / %.2f GB", disk.usedGB, disk.totalGB),

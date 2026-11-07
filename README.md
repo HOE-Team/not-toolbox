@@ -27,6 +27,7 @@
 - [🖥️ 系统要求](#️-系统要求)
 - [🚀 安装和运行](#-安装和运行)
 - [📦 JAR分发说明](#-jar分发说明)
+- [🔐 发布签名与校验](#-发布签名与校验)
 - [🤝 如何贡献](#-如何贡献)
 - [📁 项目结构](#-项目结构)
 - [🔗 技术栈](#-技术栈)
@@ -108,6 +109,94 @@ java -jar build/libs/NTB-shrunk.jar
 - **便携性**：单个JAR文件包含所有依赖
 - **易于分发**：无需复杂的安装过程
 
+## 🔐 发布签名与校验
+
+正式发布使用 GPG 对 `binary_sha256.sha256` 做分离签名。启动器只做基础 SHA256 完整性校验；GPG 签名用于确认发布来源，需要用户主动验证。
+
+**发布公钥指纹：**
+
+```text
+4900 8F79 0CDB B34E C1D2 6A82 CE50 A883 DE74 5329
+```
+
+公钥随安装包分发，位于 `res/GoldenHoe_pub.asc`；应用资源中也包含一份 `gpg/GoldenHoe_pub.asc`。
+
+### 发布的文件
+
+| 文件 | 说明 |
+|---|---|
+| `binary/NTB-shrunk.jar` | 主程序 |
+| `binary_sha256.sha256` | 主程序 SHA256 |
+| `binary_sha256.sha256.asc` | 上述校验文件的 GPG 签名 |
+| `res/GoldenHoe_pub.asc` | 发布公钥 |
+
+### 用户校验
+
+Windows（安装目录）：
+
+```powershell
+gpg --import .\res\GoldenHoe_pub.asc
+gpg --verify .\binary_sha256.sha256.asc .\binary_sha256.sha256
+(Get-FileHash .\binary\NTB-shrunk.jar -Algorithm SHA256).Hash.ToLower()
+```
+
+Linux（解压目录）：
+
+```bash
+gpg --import ./res/GoldenHoe_pub.asc
+gpg --verify ./binary_sha256.sha256.asc ./binary_sha256.sha256
+sha256sum ./binary/NTB-shrunk.jar
+```
+
+### 启动器校验
+
+Windows 启动器会读取 `binary_sha256.sha256` 并核对主程序 SHA256。校验失败会阻止启动，用于发现下载损坏或打包错误。
+
+开发构建可以跳过：
+
+```powershell
+NTB.exe --skip-integrity
+```
+
+或设置环境变量 `NTB_SKIP_INTEGRITY=1`。
+
+> [!NOTE]
+> SHA256 只能发现文件损坏/打包不一致，不能证明发布来源。发布来源由 GPG 签名保证，但它需要用户核对公钥指纹；如果公钥、签名、程序被一起替换，包内校验无法发现。
+
+### 维护者签名
+
+以下命令跨平台，不需要仓库里的 PowerShell 辅助脚本。先进入 `startup` 目录。
+
+1. 生成与当前 JAR 匹配的哈希：
+
+   Windows PowerShell：
+   ```powershell
+   $h = (Get-FileHash ..\build\libs\NTB-shrunk.jar -Algorithm SHA256).Hash.ToLower()
+   Set-Content -Path binary_sha256.sha256 -Value $h -NoNewline -Encoding ascii
+   ```
+
+   Linux：
+   ```bash
+   sha256sum ../build/libs/NTB-shrunk.jar > binary_sha256.sha256
+   ```
+
+   macOS：
+   ```bash
+   shasum -a 256 ../build/libs/NTB-shrunk.jar > binary_sha256.sha256
+   ```
+
+2. 使用本机 GPG keyring 中的私钥签名：
+   ```bash
+   gpg --local-user 49008F790CDBB34EC1D26A82CE50A883DE745329 \
+       --armor --detach-sign \
+       --output binary_sha256.sha256.asc \
+       binary_sha256.sha256
+   ```
+
+3. 发布时同时上传 `binary_sha256.sha256.asc` 与安装包内的 `res/GoldenHoe_pub.asc`（仓库路径为 `startup/res-py/GoldenHoe_pub.asc`）。
+
+私钥不会进入仓库，也不应复制到项目目录；`/gpgkeys` 仅用于本机导入。
+
 ## 🤝 如何贡献
 欢迎向我们发送 Issue 或 Pull Request。
 
@@ -175,9 +264,10 @@ not-toolbox/
 │   └── LICENSE-MIT-NTB-     # NTB LPT(打包程序)许可证
 |         LAUNCHER-PACK-TOOLS
 ├── startup/                 # 启动脚本与启动器
-│   ├── res-py               # 打包用资源文件
+│   ├── res-py               # 打包用资源文件（含发布公钥）
 │   └── pyi                  # 打包操作目录
 ├── src/main/resources/      # 资源文件
+│   └── gpg/                 # 发布公钥与指纹信息
 ├── build.gradle.kts         # Gradle构建配置
 └── README.md                # 项目说明
 ```
@@ -214,6 +304,113 @@ not-toolbox/
 // 编译时常量：true=启用本地DEBUG包列表，false=从远程拉取
 const val IS_DEBUG = false
 ```
+
+### GPG 签名（开发者）
+
+<details>
+<summary>查看 GPG 签名与验证事宜</summary>
+
+正式发布由维护者使用 GPG 私钥签名，普通开发构建不需要私钥，也不需要 GPG。
+签名需要本机安装 GnuPG（`gpg` 在 PATH 中，或安装在默认 GnuPG 目录）。
+
+**维护者签名（在 `startup` 目录执行，跨平台）：**
+
+1. 确认私钥已经在当前用户 keyring 中（不会输出私钥内容）：
+   ```bash
+   gpg --list-secret-keys 49008F790CDBB34EC1D26A82CE50A883DE745329
+   ```
+
+2. 生成与当前 JAR 匹配的发布哈希。
+
+   Windows PowerShell：
+   ```powershell
+   $h = (Get-FileHash ..\build\libs\NTB-shrunk.jar -Algorithm SHA256).Hash.ToLower()
+   Set-Content -Path binary_sha256.sha256 -Value $h -NoNewline -Encoding ascii
+   ```
+
+   Linux：
+   ```bash
+   sha256sum ../build/libs/NTB-shrunk.jar > binary_sha256.sha256
+   ```
+
+   macOS：
+   ```bash
+   shasum -a 256 ../build/libs/NTB-shrunk.jar > binary_sha256.sha256
+   ```
+
+3. 用 keyring 中的私钥签名：
+   ```bash
+   gpg --local-user 49008F790CDBB34EC1D26A82CE50A883DE745329 \
+       --armor --detach-sign \
+       --output binary_sha256.sha256.asc \
+       binary_sha256.sha256
+   ```
+
+签名产物为 `startup/binary_sha256.sha256.asc`。
+
+**验证发布：**
+
+```bash
+gpg --verify binary_sha256.sha256.asc binary_sha256.sha256
+```
+
+再核对 JAR 哈希：
+
+- Windows PowerShell：`(Get-FileHash ..\build\libs\NTB-shrunk.jar -Algorithm SHA256).Hash.ToLower()`
+- Linux：`sha256sum ../build/libs/NTB-shrunk.jar`
+- macOS：`shasum -a 256 ../build/libs/NTB-shrunk.jar`
+
+> [!NOTE]
+> 仓库不跟踪 `.ps1` 辅助脚本；上面的 GPG 命令是跨平台的，Windows、Linux、macOS 都可以直接执行。
+
+**Fork 仓库 / 分支开发者：**
+
+- **不要使用维护者私钥，也不要向维护者索要私钥。** Fork 应该生成或使用自己的 GPG key。
+- 只是开发/测试、不对外发布时，不需要签名，正常执行 `gradlew build` 即可。
+- 如果 Fork 要对外发布，需要把仓库里的“官方公钥”替换成自己的：
+
+  1. 生成或导入自己的 GPG key，并记下指纹：
+     ```powershell
+     gpg --full-generate-key
+     gpg --list-secret-keys --keyid-format=long
+     ```
+  2. 导出自己的公钥：
+     ```powershell
+     gpg --armor --output "startup\res-py\<你的名字>_pub.asc" --export <你的指纹>
+     ```
+  3. 同步替换这些位置：
+     - `startup/res-py/GoldenHoe_pub.asc`
+     - `src/main/resources/gpg/GoldenHoe_pub.asc`
+     - `startup/res-py/FINGERPRINT.txt`
+     - `src/main/resources/gpg/FINGERPRINT.txt`
+     - `src/main/kotlin/utils/ReleaseKey.kt` 中的 `FINGERPRINT` / `PUBLIC_KEY_RESOURCE` / `PUBLIC_KEY_PACKAGE_PATH` / `PUBLIC_KEY_URL`
+     - 如果改了文件名，还要同步 `pack-exe.iss`、`pack-linux-tar.bat` 中的公钥路径
+  4. 构建 JAR，生成哈希，然后用自己的 key 签名：
+     ```bash
+     cd startup
+     # 哈希生成见上文（Windows / Linux / macOS 三种命令）
+     gpg --local-user <你的指纹> \
+         --armor --detach-sign \
+         --output binary_sha256.sha256.asc \
+         binary_sha256.sha256
+     ```
+  5. 验证自己的发布（仍在上一步的 `startup` 目录）：
+     ```bash
+     gpg --import res-py/<你的名字>_pub.asc
+     gpg --verify binary_sha256.sha256.asc binary_sha256.sha256
+     ```
+  6. 在 README、About 和 Release 说明中明确这是 **Fork 构建**，不要使用官方名义发布。
+
+- 如果在官方仓库的普通分支上开发，不需要签名；正式发布由维护者完成。测试构建如果要自签，请使用自己的 key，不要覆盖或提交官方公钥。
+- 私钥只放在本机 keyring 或 CI Secret，不要提交到仓库；`/gpgkeys` 已在 `.gitignore` 中。
+
+**注意：**
+
+- GPG 签名是分离签名，不会让 Java 自动拒绝被修改的 JAR。
+- 启动器只做 SHA256 基础校验；GPG 签名需要用户主动验证。
+- 密钥指纹必须通过官网、README 或 Release 页面核对。
+
+</details>
 
 ### Packages Lists JSON RAW 源仓库
 参见 [HOE-Team/not-toolbox-resource](https://github.com/HOE-Team/not-toolbox-resource)

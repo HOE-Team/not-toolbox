@@ -7,6 +7,7 @@
 
 package components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,19 +17,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppScaffold(
     startBar: @Composable () -> Unit = {},
@@ -40,37 +38,51 @@ fun AppScaffold(
     // 检测当前操作系统
     val isMacOS = System.getProperty("os.name").lowercase().contains("mac")
 
-    MaterialTheme {
-        Scaffold() { paddingValues ->
-            // fillMaxSize 确保宽高随窗口尺寸变化强制重排（修复 Linux 下缩放窗口显示面积不变）
-            Row(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-                // 左侧导航栏占满整个高度
-                Box(modifier = Modifier.fillMaxHeight()) { startBar() }
+    Scaffold(containerColor = MaterialTheme.colorScheme.background) { paddingValues ->
+        // fillMaxSize 确保宽高随窗口尺寸变化强制重排（修复 Linux 下缩放窗口显示面积不变）
+        Row(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+            // 左侧导航栏占满整个高度
+            Box(modifier = Modifier.fillMaxHeight()) { startBar() }
 
-                // 右侧：顶部为 TopBar，下方内容填满剩余空间
-                Column(modifier = Modifier.fillMaxSize()) {
-                    TopBar(title = topBarTitle, actions = topBarActions)
+            // 右侧：顶部为 TopBar，下方内容填满剩余空间
+            // 使用 weight(1f) 明确占用导航栏之外的空间，避免 fillMaxSize 在 Row 中
+            // 以整窗宽度测量而导致内容区被导航栏向右挤出窗口。
+            Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                TopBar(title = topBarTitle, actions = topBarActions)
 
-                    // TopBar 下方的进度提示（如后台检查更新）
-                    topBarProgress()
+                // TopBar 下方的进度提示（如后台检查更新）
+                topBarProgress()
 
-                    // 如果是macOS，显示警告
-                    if (isMacOS) {
+                // 如果是macOS，显示警告
+                if (isMacOS) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 8.dp),
+                        shape = MaterialTheme.shapes.large,
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.25f))
+                    ) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
-                                .background(MaterialTheme.colorScheme.error.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-                                .padding(12.dp),
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(MaterialSymbols.Warning, "警告", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.error)
-                            Text("当前系统为macOS环境，您将无法使用大部分功能", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(start = 8.dp))
+                            Icon(MaterialSymbols.Warning, "警告", Modifier.size(20.dp))
+                            Text(
+                                "当前系统为macOS环境，您将无法使用大部分功能",
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(start = 10.dp)
+                            )
                         }
                     }
-
-                    Box(modifier = Modifier.fillMaxSize().padding(8.dp)) { content() }
                 }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) { content() }
             }
         }
     }

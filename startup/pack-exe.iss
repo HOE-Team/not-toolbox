@@ -34,6 +34,9 @@ Source: ".\pyi\NTB\NTB.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: ".\pyi\NTB\_internal\*"; DestDir: "{app}\_internal"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\build\libs\NTB-shrunk.jar"; DestDir: "{app}\binary"; Flags: ignoreversion
 Source: "binary_sha256.sha256"; DestDir: "{app}"; Flags: ignoreversion
+Source: "binary_sha256.sha256.asc"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: ".\res-py\GoldenHoe_pub.asc"; DestDir: "{app}\res"; Flags: ignoreversion
+Source: ".\res-py\FINGERPRINT.txt"; DestDir: "{app}\res"; Flags: ignoreversion
 Source: ".\res-py\logo-uninstall.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]

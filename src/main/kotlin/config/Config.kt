@@ -67,6 +67,8 @@ data class AppConfig(
     val useCustomBg: Boolean = false,
     // 用户自选的本地背景文件名（存放在程序目录 /cardbg/ 下）
     val customBgFile: String? = null,
+    // 是否使用波浪形进度指示器（Material 3 Expressive）
+    val wavyProgress: Boolean = false,
     // 工具页面本地指令的终端会话模式（NEW=每次新建 / DEFAULT=使用默认会话）
     val toolCommandSession: String = "NEW",
     // 终端进程结束后是否立即结束会话（false=等待用户按回车关闭）
@@ -89,6 +91,7 @@ fun loadConfig(): AppConfig {
         var customGreeting: String? = null
         var useCustomBg: Boolean = false
         var customBgFile: String? = null
+        var wavyProgress: Boolean = false
         var toolCommandSession: String = "NEW"
         var closeSessionOnEnd: Boolean = false
         for (raw in lines) {
@@ -158,6 +161,11 @@ fun loadConfig(): AppConfig {
                     if (v.startsWith("\"") && v.endsWith("\"")) v = v.substring(1, v.length - 1)
                     if (v.isNotBlank()) customBgFile = v
                 }
+            } else if (line.startsWith("wavy_progress")) {
+                val parts = line.split('=', limit = 2)
+                if (parts.size == 2) {
+                    wavyProgress = parts[1].trim().lowercase() == "true"
+                }
             } else if (line.startsWith("tool_command_session")) {
                 val parts = line.split('=', limit = 2)
                 if (parts.size == 2) {
@@ -172,7 +180,7 @@ fun loadConfig(): AppConfig {
                 }
             }
         }
-        AppConfig(dark = dark, color = color, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, greetingMode = greetingMode, customGreeting = customGreeting, useCustomBg = useCustomBg, customBgFile = customBgFile, toolCommandSession = toolCommandSession, closeSessionOnEnd = closeSessionOnEnd)
+        AppConfig(dark = dark, color = color, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, greetingMode = greetingMode, customGreeting = customGreeting, useCustomBg = useCustomBg, customBgFile = customBgFile, wavyProgress = wavyProgress, toolCommandSession = toolCommandSession, closeSessionOnEnd = closeSessionOnEnd)
     } catch (e: Exception) {
         AppConfig()
     }
@@ -221,6 +229,7 @@ fun saveConfig(cfg: AppConfig) {
             sb.append("\"\"")
         }
         sb.append('\n')
+        sb.append("wavy_progress = ").append(if (cfg.wavyProgress) "true" else "false").append('\n')
         sb.append("tool_command_session = \"").append(cfg.toolCommandSession).append("\"\n")
         sb.append("close_session_on_end = ").append(if (cfg.closeSessionOnEnd) "true" else "false").append('\n')
         Files.writeString(tmp, sb.toString())

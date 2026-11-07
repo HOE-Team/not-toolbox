@@ -7,28 +7,37 @@
 
 package screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.DividerDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import components.MaterialSymbols
 import ntb.generated.resources.Res
 import ntb.generated.resources.logo
 import org.jetbrains.compose.resources.painterResource
+import theme.warningColors
+import utils.ReleaseKey
 
 @Composable
 fun AboutScreen() {
+    val uriHandler = LocalUriHandler.current
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -91,9 +100,91 @@ fun AboutScreen() {
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "版本：O-1.0.7-RC1",
+            text = "版本：O-1.0.7.1-w45a",
             style = MaterialTheme.typography.bodyMedium
         )
+
+        Spacer(modifier = Modifier.height(24.dp))
+        HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // 发布签名信息
+        Text(
+            text = "发布签名",
+            style = MaterialTheme.typography.headlineSmall
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            text = "公钥指纹：",
+            style = MaterialTheme.typography.bodyMedium
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = ReleaseKey.FINGERPRINT,
+            style = MaterialTheme.typography.bodySmall,
+            fontFamily = FontFamily.Monospace
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            text = "公钥文件：",
+            style = MaterialTheme.typography.bodyMedium
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = ReleaseKey.PUBLIC_KEY_PACKAGE_PATH,
+            style = MaterialTheme.typography.bodySmall,
+            fontFamily = FontFamily.Monospace
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "此公钥同时可以在以下的链接中找到",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = ReleaseKey.PUBLIC_KEY_URL,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.clickable { uriHandler.openUri(ReleaseKey.PUBLIC_KEY_URL) }
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            text = "SHA256校验和：",
+            style = MaterialTheme.typography.bodyMedium
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "binary_sha256.sha256",
+            style = MaterialTheme.typography.bodySmall,
+            fontFamily = FontFamily.Monospace
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+
+        val warning = MaterialTheme.warningColors
+        Surface(
+            color = warning.container,
+            contentColor = warning.onContainer,
+            shape = MaterialTheme.shapes.large,
+            border = BorderStroke(1.dp, warning.action.copy(alpha = 0.55f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = MaterialSymbols.Warning,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = warning.action
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = "校验和文件和公钥文件不能保证程序二进制的绝对完整和安全，这些文件可能被篡改，请注意核对您的二进制来源",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(24.dp))
         HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)

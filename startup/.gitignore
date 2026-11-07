@@ -13,3 +13,6 @@ installer
 # Others
 autopack.bat
 Get-Hash.bat
+
+# verify script
+*.ps1

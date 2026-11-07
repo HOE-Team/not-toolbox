@@ -80,7 +80,7 @@ private fun AiMessageBubble(
 
         if (isUser) {
             if (message.text.isNotBlank()) {
-                AiTextBubble(text = message.text, streaming = false, error = null, isUser = true)
+                AiTextBubble(text = message.text, streaming = false, isUser = true)
             }
         } else {
             AiTimeline(
@@ -126,7 +126,7 @@ private fun AiTimeline(
             is ChatSegment.ToolCallSegment -> true
         }
     }
-    val bubbleVisible = message.text.isNotBlank() || message.streaming || message.error != null
+    val bubbleVisible = message.text.isNotBlank() || message.streaming
     // 没有卡片（只有正文）时不画时间线，保持原来的单气泡外观
     val railVisible = nodes.isNotEmpty()
 
@@ -165,7 +165,6 @@ private fun AiTimeline(
                 AiTextBubble(
                     text = message.text,
                     streaming = message.streaming,
-                    error = message.error,
                     isUser = false
                 )
             }
@@ -254,19 +253,31 @@ private fun AiTimelineNode(
 private fun AiTextBubble(
     text: String,
     streaming: Boolean,
-    error: String?,
     isUser: Boolean
 ) {
     Surface(
         color = if (isUser) {
             MaterialTheme.colorScheme.primaryContainer
         } else {
-            MaterialTheme.colorScheme.surfaceVariant
+            MaterialTheme.colorScheme.surfaceContainerHigh
         },
-        shape = RoundedCornerShape(12.dp),
+        contentColor = if (isUser) {
+            MaterialTheme.colorScheme.onPrimaryContainer
+        } else {
+            MaterialTheme.colorScheme.onSurface
+        },
+        shape = if (isUser) {
+            RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomEnd = 8.dp, bottomStart = 24.dp)
+        } else {
+            RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomEnd = 24.dp, bottomStart = 8.dp)
+        },
+        border = if (isUser) null else BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        ),
         modifier = Modifier.widthIn(max = 760.dp)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
             if (text.isNotBlank()) {
                 if (isUser) {
                     SelectionContainer {
@@ -290,14 +301,6 @@ private fun AiTextBubble(
                 }
             }
 
-            error?.let { message ->
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "⚠ $message",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
         }
     }
 }

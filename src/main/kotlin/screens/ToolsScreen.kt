@@ -7,17 +7,25 @@
 
 package screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
+import components.ExpressiveEmptyState
+import components.ExpressiveLoadingState
+import components.ExpressivePillTabs
 import components.MaterialSymbols
+import components.PillTab
+import components.StatusPill
+import components.TonalIcon
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -246,10 +254,10 @@ fun ToolsScreen(
                             IconButton(onClick = { onSearchQueryChange("") }) { Icon(MaterialSymbols.Close, contentDescription = "清除") }
                     },
                     singleLine = true,
-                    shape = RoundedCornerShape(8.dp)
+                    shape = MaterialTheme.shapes.extraLarge
                 )
                 Box {
-                    IconButton(onClick = { filterMenuExpanded = true }) { Icon(MaterialSymbols.FilterList, contentDescription = "筛选") }
+                    FilledTonalIconButton(onClick = { filterMenuExpanded = true }) { Icon(MaterialSymbols.FilterList, contentDescription = "筛选") }
                     DropdownMenu(expanded = filterMenuExpanded, onDismissRequest = { filterMenuExpanded = false }) {
                         ToolFilter.entries.forEach { f ->
                             DropdownMenuItem(
@@ -300,30 +308,27 @@ fun ToolsScreen(
                 }
             }
         } else {
-            // 非搜索模式：显示一级 Tabs
-            PrimaryTabRow(selectedTabIndex = sourceTab, modifier = Modifier.fillMaxWidth()) {
-                Tab(
-                    selected = sourceTab == 0,
-                    onClick = { onSourceTabChange(0) },
-                    icon = { Icon(MaterialSymbols.Link, "联机", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary) },
-                    text = { Text("联机", fontSize = 14.sp) }
-                )
-                Tab(
-                    selected = sourceTab == 1,
-                    onClick = { onSourceTabChange(1) },
-                    icon = { Icon(MaterialSymbols.LinkOff, "本地", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary) },
-                    text = { Text("本地", fontSize = 14.sp) }
-                )
-            }
+            // 非搜索模式：Expressive 胶囊式一级导航
+            ExpressivePillTabs(
+                tabs = listOf(
+                    PillTab("联机", MaterialSymbols.Link),
+                    PillTab("本地", MaterialSymbols.LinkOff)
+                ),
+                selectedIndex = sourceTab,
+                onSelect = onSourceTabChange,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
 
             if (sourceTab == 0 && showOnline) {
                 // 联机模式
                 if (categories.isNotEmpty()) {
-                    PrimaryTabRow(selectedTabIndex = selectedTab, modifier = Modifier.fillMaxWidth()) {
-                        categories.forEachIndexed { index, title ->
-                            Tab(selected = selectedTab == index, onClick = { selectedTab = index }, text = { Text(title, fontSize = 12.sp) })
-                        }
-                    }
+                    ExpressivePillTabs(
+                        tabs = categories.map { PillTab(it) },
+                        selectedIndex = selectedTab,
+                        onSelect = { selectedTab = it },
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        scrollable = true
+                    )
                 }
                 Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp)) {
                     when {
@@ -375,28 +380,48 @@ fun ToolsScreen(
                                             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                                     Text("添加指令", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(end = 12.dp))
-                                                    SmallFloatingActionButton(onClick = { fabMenuExpanded = false; showLinuxInputDialog = true }) {
+                                                    SmallFloatingActionButton(
+                                                        onClick = { fabMenuExpanded = false; showLinuxInputDialog = true },
+                                                        shape = MaterialTheme.shapes.large,
+                                                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                                    ) {
                                                         Icon(MaterialSymbols.Terminal2, contentDescription = "添加指令")
                                                     }
                                                 }
                                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                                     Text("添加可执行文件", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(end = 12.dp))
-                                                    SmallFloatingActionButton(onClick = {
-                                                        fabMenuExpanded = false
-                                                        handleAddExecutable { path -> if (path.isNotBlank()) { addOfflineItem(MOfflineEntryType.PATH, path); offlineItems = loadOfflineItems() } }
-                                                    }) {
+                                                    SmallFloatingActionButton(
+                                                        onClick = {
+                                                            fabMenuExpanded = false
+                                                            handleAddExecutable { path -> if (path.isNotBlank()) { addOfflineItem(MOfflineEntryType.PATH, path); offlineItems = loadOfflineItems() } }
+                                                        },
+                                                        shape = MaterialTheme.shapes.large,
+                                                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                                    ) {
                                                         Icon(MaterialSymbols.AppRegistration, contentDescription = "添加可执行文件")
                                                     }
                                                 }
                                             }
                                         }
                                         Spacer(modifier = Modifier.height(8.dp))
-                                        FloatingActionButton(onClick = { fabMenuExpanded = !fabMenuExpanded }) {
+                                        FloatingActionButton(
+                                            onClick = { fabMenuExpanded = !fabMenuExpanded },
+                                            shape = MaterialTheme.shapes.extraLarge,
+                                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                        ) {
                                             Icon(if (fabMenuExpanded) MaterialSymbols.Close else MaterialSymbols.Add, if (fabMenuExpanded) "收起" else "添加")
                                         }
                                     }
                                 } else {
-                                    FloatingActionButton(onClick = { showLinuxInputDialog = true }) { Icon(MaterialSymbols.Add, "添加") }
+                                    FloatingActionButton(
+                                        onClick = { showLinuxInputDialog = true },
+                                        shape = MaterialTheme.shapes.extraLarge,
+                                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                    ) { Icon(MaterialSymbols.Add, "添加") }
                                 }
                             }
                         }
@@ -491,28 +516,57 @@ private fun GlobalResultGrid(
 
 @Composable
 private fun SectionTitle(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-    )
+    Row(
+        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .width(4.dp)
+                .height(20.dp)
+                .background(MaterialTheme.colorScheme.primary, CircleShape)
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
 }
 
 @Composable
 private fun EmptyOfflineHint(isWindows: Boolean, onAddPathClick: () -> Unit, onAddCommandClick: () -> Unit) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("列表为空", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurface)
-            Text(if (isWindows) "添加一个本地可执行程序或指令来使用离线功能" else "添加一个指令来使用离线功能",
-                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-            if (isWindows) {
-                Button(onClick = onAddPathClick) { Icon(MaterialSymbols.AppRegistration, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("添加一个可执行文件") }
-                OutlinedButton(onClick = onAddCommandClick) { Icon(MaterialSymbols.Terminal2, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("添加一个指令") }
+        ExpressiveEmptyState(
+            icon = MaterialSymbols.Terminal2,
+            title = "列表为空",
+            message = if (isWindows) {
+                "添加一个本地可执行程序或指令来使用离线功能"
             } else {
-                Button(onClick = onAddCommandClick) { Icon(MaterialSymbols.Terminal2, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("添加一个指令") }
+                "添加一个指令来使用离线功能"
+            },
+            actions = {
+                if (isWindows) {
+                    Button(onClick = onAddPathClick, shape = CircleShape) {
+                        Icon(MaterialSymbols.AppRegistration, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("添加一个可执行文件")
+                    }
+                    OutlinedButton(onClick = onAddCommandClick, shape = CircleShape) {
+                        Icon(MaterialSymbols.Terminal2, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("添加一个指令")
+                    }
+                } else {
+                    Button(onClick = onAddCommandClick, shape = CircleShape) {
+                        Icon(MaterialSymbols.Terminal2, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("添加一个指令")
+                    }
+                }
             }
-        }
+        )
     }
 }
 
@@ -531,22 +585,65 @@ private fun LocalToolCardGrid(items: List<OfflineItem>, onRun: (OfflineItem) -> 
 @Composable
 private fun LocalToolCard(item: OfflineItem, onRun: () -> Unit, onDelete: () -> Unit, onEdit: () -> Unit, modifier: Modifier = Modifier) {
     val isPath = item.type == MOfflineEntryType.PATH
-    Card(modifier = modifier.height(160.dp), elevation = CardDefaults.cardElevation(4.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-        Column(modifier = Modifier.fillMaxSize().padding(12.dp), horizontalAlignment = Alignment.Start, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(item.value, style = MaterialTheme.typography.titleSmall, maxLines = 2, modifier = Modifier.weight(1f))
-                if (item.type == MOfflineEntryType.COMMAND) {
-                    IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) { Icon(MaterialSymbols.Edit, "修改", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary) }
+    Card(
+        modifier = modifier.height(210.dp),
+        shape = MaterialTheme.shapes.extraLarge,
+        elevation = CardDefaults.cardElevation(0.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(20.dp),
+            horizontalAlignment = Alignment.Start,
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                TonalIcon(
+                    icon = if (isPath) MaterialSymbols.AppRegistration else MaterialSymbols.Terminal2,
+                    contentDescription = null,
+                    size = 44.dp,
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = item.value,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = if (isPath) "本地可执行文件" else "离线指令",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-                IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) { Icon(MaterialSymbols.Delete, "删除", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error) }
+                if (item.type == MOfflineEntryType.COMMAND) {
+                    IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+                        Icon(MaterialSymbols.Edit, "修改", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
+                IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                    Icon(MaterialSymbols.Delete, "删除", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+                }
             }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-                Icon(if (isPath) MaterialSymbols.AppRegistration else MaterialSymbols.Terminal2, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
-                Text(if (isPath) "可执行文件" else "指令", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                StatusPill(
+                    text = if (isPath) "可执行文件" else "指令",
+                    icon = if (isPath) MaterialSymbols.AppRegistration else MaterialSymbols.Terminal2
+                )
             }
             Spacer(modifier = Modifier.weight(1f))
-            Button(onClick = onRun, modifier = Modifier.fillMaxWidth()) {
-                Icon(MaterialSymbols.PlayArrow, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text(if (isPath) "运行" else "执行", fontSize = 12.sp)
+            Button(
+                onClick = onRun,
+                modifier = Modifier.fillMaxWidth().height(44.dp),
+                shape = CircleShape
+            ) {
+                Icon(MaterialSymbols.PlayArrow, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(if (isPath) "运行" else "执行")
             }
         }
     }
@@ -557,12 +654,20 @@ private fun LinuxCommandInputDialog(initialValue: String = "", isEdit: Boolean =
     var cmd by remember { mutableStateOf(initialValue) }
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = MaterialTheme.shapes.extraLarge,
         title = { Text(if (isEdit) "修改指令" else "添加指令") },
         text = {
             Column {
                 Text("输入一个快捷指令，用于离线执行:")
                 Spacer(modifier = Modifier.height(12.dp))
-                OutlinedTextField(cmd, { cmd = it }, placeholder = { Text("例如: sudo apt-get update") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                OutlinedTextField(
+                    value = cmd,
+                    onValueChange = { cmd = it },
+                    placeholder = { Text("例如: sudo apt-get update") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.extraLarge
+                )
             }
         },
         confirmButton = { Button(onClick = { onConfirm(cmd) }, enabled = cmd.isNotBlank()) { Text(if (isEdit) "保存" else "添加") } },
@@ -573,35 +678,31 @@ private fun LinuxCommandInputDialog(initialValue: String = "", isEdit: Boolean =
 @Composable
 private fun LoadingHint() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            CircularProgressIndicator(modifier = Modifier.size(48.dp), strokeWidth = 4.dp)
-            Text("正在拉取应用列表", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+        ExpressiveLoadingState(label = "正在拉取应用列表", modifier = Modifier.widthIn(max = 420.dp))
     }
 }
 
-/** 检测已安装包期间占位：显示转圈并隐藏卡片 */
+/** 检测已安装包期间占位：显示加载动画并隐藏卡片 */
 @Composable
 private fun DetectingHint() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            CircularProgressIndicator(modifier = Modifier.size(48.dp), strokeWidth = 4.dp)
-            Text("正在检测已安装的应用", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+        ExpressiveLoadingState(label = "正在检测已安装的应用", modifier = Modifier.widthIn(max = 420.dp))
     }
 }
 
-/** 检查可用更新期间占位：显示转圈，并提供「立即显示列表」提前查看卡片 */
+/** 检查可用更新期间占位：显示加载动画，并提供「立即显示列表」提前查看卡片 */
 @Composable
 private fun CheckingUpdatesHint(onShowNow: () -> Unit) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            CircularProgressIndicator(modifier = Modifier.size(48.dp), strokeWidth = 4.dp)
-            Text("正在检查可用更新", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            OutlinedButton(onClick = onShowNow) {
-                Text("立即显示列表")
+        ExpressiveLoadingState(
+            label = "正在检查可用更新",
+            modifier = Modifier.widthIn(max = 420.dp),
+            actions = {
+                OutlinedButton(onClick = onShowNow, shape = CircleShape) {
+                    Text("立即显示列表")
+                }
             }
-        }
+        )
     }
 }
 
@@ -612,53 +713,57 @@ private fun WarningAwareSnackbar(data: SnackbarData, warning: Boolean) {
         val colors = MaterialTheme.warningColors
         Snackbar(
             snackbarData = data,
+            shape = MaterialTheme.shapes.large,
             containerColor = colors.container,
             contentColor = colors.onContainer,
             actionColor = colors.action,
             actionContentColor = colors.action
         )
     } else {
-        Snackbar(snackbarData = data)
+        Snackbar(snackbarData = data, shape = MaterialTheme.shapes.large)
     }
 }
 
 @Composable
 private fun SearchPromptHint() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(MaterialSymbols.Search, "键入来搜索", Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
-            Text("键入来搜索", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-            Text("输入字符来进行搜索", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-        }
+        ExpressiveEmptyState(
+            icon = MaterialSymbols.Search,
+            title = "键入来搜索",
+            message = "输入字符来进行搜索",
+            modifier = Modifier.widthIn(max = 460.dp)
+        )
     }
 }
 
 @Composable
 private fun EmptySearchHint() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(MaterialSymbols.SearchOff, "无搜索结果", Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
-            Text("没有匹配的工具", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-            Text("尝试更换搜索关键词", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-        }
+        ExpressiveEmptyState(
+            icon = MaterialSymbols.SearchOff,
+            title = "没有匹配的工具",
+            message = "尝试更换搜索关键词",
+            modifier = Modifier.widthIn(max = 460.dp)
+        )
     }
 }
 
 @Composable
 private fun EmptyPackageListHint(errorMessage: String? = null, onRetry: () -> Unit = {}) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(MaterialSymbols.FileDownloadOff, "无法获取应用列表", Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
-            Text("Oops! 无法获取应用列表", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-            Text(errorMessage ?: "请稍后再试，或检查网络连接", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-            Spacer(modifier = Modifier.height(8.dp))
-            // 重试按钮
-            Button(onClick = onRetry) {
-                Icon(MaterialSymbols.Refresh, "重试", Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("重试")
+        ExpressiveEmptyState(
+            icon = MaterialSymbols.FileDownloadOff,
+            title = "Oops! 无法获取应用列表",
+            message = errorMessage ?: "请稍后再试，或检查网络连接",
+            modifier = Modifier.widthIn(max = 460.dp),
+            actions = {
+                Button(onClick = onRetry, shape = CircleShape) {
+                    Icon(MaterialSymbols.Refresh, "重试", Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("重试")
+                }
             }
-        }
+        )
     }
 }
 
@@ -727,69 +832,98 @@ fun ToolCard(
         null -> null
     }
 
-    Card(modifier = modifier.height(260.dp), elevation = CardDefaults.cardElevation(4.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-        Column(modifier = Modifier.fillMaxSize().padding(12.dp), horizontalAlignment = Alignment.Start, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    val isWindows = remember { System.getProperty("os.name").lowercase().contains("windows") }
+    val versionLabel = installedEntry?.version?.let { "已安装 · $it" } ?: "已安装"
+
+    Card(
+        modifier = modifier.height(240.dp),
+        shape = MaterialTheme.shapes.extraLarge,
+        elevation = CardDefaults.cardElevation(0.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(20.dp),
+            horizontalAlignment = Alignment.Start,
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = tool.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                TonalIcon(
+                    icon = MaterialSymbols.Apps,
+                    contentDescription = null,
+                    size = 44.dp,
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                 )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = tool.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (packageName != null && packageManager != PackageManagerType.UNKNOWN) {
+                        Text(
+                            text = (if (isWindows) "包名 · " else "Linux 包名 · ") + packageName,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
                 // 已安装：右上角提供卸载入口
                 if (isInstalled) {
                     IconButton(
                         onClick = { pendingAction = PackageAction.UNINSTALL },
                         enabled = uninstallCommand != null,
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(36.dp)
                     ) {
                         Icon(MaterialSymbols.Delete, "卸载", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
                     }
                 }
             }
-            Text(tool.description ?: "", style = MaterialTheme.typography.bodySmall, maxLines = 2)
-            if (tool.isProprietarySoftware) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-                    Icon(MaterialSymbols.Warning, "专有软件", Modifier.size(14.dp), tint = MaterialTheme.colorScheme.error)
-                    Text("专有软件", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                    if (tool.licenseType != null) Text("· ${tool.licenseType}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            Text(
+                text = tool.description ?: "",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (tool.isProprietarySoftware) {
+                    StatusPill(
+                        text = listOfNotNull("专有软件", tool.licenseType).joinToString(" · "),
+                        icon = MaterialSymbols.Warning,
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                } else {
+                    StatusPill(
+                        text = tool.licenseType ?: "开源软件",
+                        icon = MaterialSymbols.Description,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
                 }
-            } else {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-                    Icon(MaterialSymbols.Description, "开源", Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
-                    Text(tool.licenseType ?: "开源软件", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-                }
-            }
-            if (packageName != null && packageManager != PackageManagerType.UNKNOWN) {
-                val isWindows = System.getProperty("os.name").lowercase().contains("windows")
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-                    Icon(MaterialSymbols.Terminal, "包名", Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
-                    Text(if (isWindows) "包名: $packageName" else "Linux包名: $packageName", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-                }
-            }
-            if (isInstalled) {
-                val versionLabel = installedEntry.version?.let { "已安装 · $it" } ?: "已安装"
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-                    Icon(MaterialSymbols.Check, "已安装", Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
-                    Text(
+                if (isInstalled) {
+                    StatusPill(
                         text = versionLabel,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        icon = MaterialSymbols.Check,
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
                 }
             }
             if (isInstalled && targetVersion != null) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-                    Icon(MaterialSymbols.Info, "有更新", Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
-                    Text(
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    StatusPill(
                         text = "有更新 · $targetVersion",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        icon = MaterialSymbols.Info,
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
                     )
                 }
             }
@@ -798,28 +932,45 @@ fun ToolCard(
                 if (isInstalled) {
                     Button(
                         onClick = { pendingAction = PackageAction.UPDATE },
-                        modifier = Modifier.weight(1f),
-                        enabled = canUpdate
+                        modifier = Modifier.weight(1f).height(44.dp),
+                        shape = CircleShape,
+                        enabled = canUpdate,
+                        contentPadding = PaddingValues(horizontal = 12.dp)
                     ) {
                         // 确认无可用更新时，按钮改为「已是最新」并换用勾选图标
                         if (upToDate) {
-                            Icon(MaterialSymbols.Check, "已是最新", Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("已是最新", fontSize = 12.sp)
+                            Icon(MaterialSymbols.Check, "已是最新", Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("已是最新")
                         } else {
-                            Icon(MaterialSymbols.Refresh, "更新", Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("更新", fontSize = 12.sp)
+                            Icon(MaterialSymbols.Refresh, "更新", Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("更新")
                         }
                     }
                 } else {
                     Button(
                         onClick = { pendingAction = PackageAction.INSTALL },
-                        modifier = Modifier.weight(1f),
-                        enabled = installCommand != null
+                        modifier = Modifier.weight(1f).height(44.dp),
+                        shape = CircleShape,
+                        enabled = installCommand != null,
+                        contentPadding = PaddingValues(horizontal = 12.dp)
                     ) {
-                        Icon(MaterialSymbols.Download, "安装", Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("安装", fontSize = 12.sp)
+                        Icon(MaterialSymbols.Download, "安装", Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("安装")
                     }
                 }
                 if (licenseOrEulaUrl != null) {
-                    OutlinedButton(onClick = { openToolWebsite(licenseOrEulaUrl) }, modifier = Modifier.weight(1f)) {
-                        Icon(MaterialSymbols.OpenInNew, "查看", Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text(if (tool.isProprietarySoftware) "用户协议" else "查看许可证", fontSize = 12.sp)
+                    OutlinedButton(
+                        onClick = { openToolWebsite(licenseOrEulaUrl) },
+                        modifier = Modifier.weight(1f).height(44.dp),
+                        shape = CircleShape,
+                        contentPadding = PaddingValues(horizontal = 12.dp)
+                    ) {
+                        Icon(MaterialSymbols.OpenInNew, "查看", Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(if (tool.isProprietarySoftware) "用户协议" else "查看许可证")
                     }
                 }
             }
@@ -933,8 +1084,8 @@ fun PackageActionDialog(
     }
 
     when (dialogState) {
-        PackageDialogState.CONFIRM -> AlertDialog(onDismissRequest = onDismiss, title = { Text(confirmTitle) },
-            text = { Column { Text(confirmLead); Spacer(Modifier.height(8.dp)); Text(command, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(4.dp)).padding(8.dp)); Spacer(Modifier.height(8.dp)); Text(confirmWarning, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) } },
+        PackageDialogState.CONFIRM -> AlertDialog(onDismissRequest = onDismiss, shape = MaterialTheme.shapes.extraLarge, title = { Text(confirmTitle) },
+            text = { Column { Text(confirmLead); Spacer(Modifier.height(8.dp)); Text(command, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.shapes.medium).padding(10.dp)); Spacer(Modifier.height(8.dp)); Text(confirmWarning, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) } },
             confirmButton = { Button(onClick = { onConfirm(); dialogState = PackageDialogState.PROGRESS }) { Text(confirmTitle) } },
             dismissButton = { OutlinedButton(onClick = onDismiss) { Text("取消") } })
         PackageDialogState.PROGRESS -> {
@@ -958,7 +1109,7 @@ fun PackageActionDialog(
             }
             // 嵌入式终端样式的输出区域（深色背景 + ANSI 着色 + 等宽字体）
             val annotatedOutput = remember(output) { parseAnsiForDialog(output) }
-            AlertDialog(onDismissRequest = {}, title = { Text(progressTitle) },
+            AlertDialog(onDismissRequest = {}, shape = MaterialTheme.shapes.extraLarge, title = { Text(progressTitle) },
                 text = {
                     Column {
                         // 内嵌终端的输入状态（PROGRESS 期间持有）
@@ -976,7 +1127,8 @@ fun PackageActionDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(min = 120.dp, max = 320.dp),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                            shape = MaterialTheme.shapes.large,
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                             colors = CardDefaults.cardColors(
                                 containerColor = Color(0xFF1E1E1E) // 深色终端背景
                             )
@@ -1072,7 +1224,7 @@ fun PackageActionDialog(
                 },
                 confirmButton = { if (running) OutlinedButton(onClick = { TerminalSessionManager.stopCurrentProcess() }) { Text("取消") } })
         }
-        PackageDialogState.RESULT -> AlertDialog(onDismissRequest = onDismiss, title = { Text(resultTitle, style = MaterialTheme.typography.titleLarge) },
+        PackageDialogState.RESULT -> AlertDialog(onDismissRequest = onDismiss, shape = MaterialTheme.shapes.extraLarge, title = { Text(resultTitle, style = MaterialTheme.typography.titleLarge) },
             text = { Text(resultText, textAlign = TextAlign.Center) },
             confirmButton = { Button(onClick = onDismiss) { Text("完成") } })
     }

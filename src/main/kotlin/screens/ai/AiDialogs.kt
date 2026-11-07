@@ -45,6 +45,7 @@ internal fun AiConfirmDialog(
     val isShell = spec?.danger == ToolDanger.SHELL
     AlertDialog(
         onDismissRequest = onDeny,
+        shape = MaterialTheme.shapes.extraLarge,
         icon = {
             Icon(
                 imageVector = MaterialSymbols.Warning,
@@ -65,8 +66,8 @@ internal fun AiConfirmDialog(
                 )
                 Spacer(modifier = Modifier.height(10.dp))
                 Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    shape = MaterialTheme.shapes.large,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(

@@ -16,9 +16,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import components.CPUStatCard
+import components.ExpressiveLoadingState
 import components.RAMStatCard
 import components.GPUStatCard
 import components.SystemOverviewCard
@@ -58,15 +60,11 @@ private fun HomeLoadingHint() {
     val stage by systemInfoLoadingStage.collectAsState()
 
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            CircularProgressIndicator(modifier = Modifier.size(48.dp), strokeWidth = 4.dp)
-            Text("正在读取系统信息", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(
-                text = stage ?: "正在初始化…",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-            )
-        }
+        ExpressiveLoadingState(
+            label = "正在读取系统信息",
+            detail = stage ?: "正在初始化…",
+            modifier = Modifier.widthIn(max = 420.dp)
+        )
     }
 }
 
@@ -89,8 +87,8 @@ private fun HomeContent(snapshot: SystemSnapshot) {
         modifier = Modifier
             .fillMaxSize()
     ) {
-        val spacing = 8.dp
-        val cardMinWidth = 290.dp
+        val spacing = 16.dp
+        val cardMinWidth = 320.dp
         val columns = (((maxWidth - spacing) + spacing) / (cardMinWidth + spacing))
             .toInt()
             .coerceAtLeast(1)
@@ -191,9 +189,10 @@ private fun HomeContent(snapshot: SystemSnapshot) {
 
             // 真正的瀑布流：先测量每张卡片，再填入当前最短的列。
             // spacingPx 使用固定像素值（密度为 1.0 时对应 8.dp）。
+            val density = LocalDensity.current
             ColumnMasonry(
                 columns = columns,
-                spacingPx = 8,
+                spacingPx = with(density) { spacing.roundToPx() },
                 items = items,
                 modifier = Modifier.fillMaxWidth()
             )

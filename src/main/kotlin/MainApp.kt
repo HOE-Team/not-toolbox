@@ -8,9 +8,12 @@
 package main.kotlin
 
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -30,6 +33,7 @@ import screens.*
 import screens.ai.AiChatState
 import screens.ai.AiScreen
 import theme.AppTheme
+import theme.LocalWavyProgress
 import utils.*
 import java.awt.Dimension
 import java.time.LocalTime
@@ -73,6 +77,7 @@ private fun resolveGreeting(
     return greetingForOverview(displayName)
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 fun main() = application {
     val windowState =  rememberWindowState(width = 1280.dp, height = 600.dp)
     Window(
@@ -116,6 +121,8 @@ fun main() = application {
         // 壁纸设置
         var useCustomBg by remember { mutableStateOf(loaded.useCustomBg) }
         var customBgFile by remember { mutableStateOf(loaded.customBgFile) }
+        // 波浪形进度指示器
+        var useWavyProgress by remember { mutableStateOf(loaded.wavyProgress) }
         // 工具指令会话模式
         var toolCommandSessionMode by remember { mutableStateOf(loaded.toolCommandSession) }
         // 终端进程结束后是否立即结束会话
@@ -164,6 +171,7 @@ fun main() = application {
                     customGreeting = customGreeting,
                     useCustomBg = useCustomBg,
                     customBgFile = customBgFile,
+                    wavyProgress = useWavyProgress,
                     toolCommandSession = toolCommandSessionMode,
                     closeSessionOnEnd = closeSessionOnEnd
                 )
@@ -180,6 +188,7 @@ fun main() = application {
         }
 
         AppTheme(darkTheme = isDark, seedHex = seedHex) {
+            CompositionLocalProvider(LocalWavyProgress provides useWavyProgress) {
             AppScaffold(
                 startBar = { NavRail(selectedIndex = selectedNavIndex, onSelection = { selectedNavIndex = it }) },
                 topBarTitle = topBarTitle,
@@ -187,7 +196,19 @@ fun main() = application {
                     // 用户点了「立即显示列表」后，用非确定性线性指示器继续提示后台仍在检查
                     val updateState by UpdateChecker.state.collectAsState()
                     if (updateState.status == UpdateCheckStatus.CHECKING && updateState.dismissed) {
-                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        if (LocalWavyProgress.current) {
+                            LinearWavyProgressIndicator(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                            )
+                        } else {
+                            LinearProgressIndicator(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                            )
+                        }
                     }
                 },
                 topBarActions = {
@@ -195,7 +216,7 @@ fun main() = application {
                         // 工具页：重新检测已安装的包，并重新检查可用更新
                         // 切到「本地」（离线）标签页时隐藏该按钮
                         if (toolSourceTab == 0) {
-                            IconButton(onClick = {
+                            FilledTonalIconButton(onClick = {
                                 appScope.launch {
                                     val manager = if (selectedPackageManager != PackageManagerType.UNKNOWN)
                                         selectedPackageManager else PackageManagerUtils.detectPackageManager(force = true)
@@ -206,7 +227,7 @@ fun main() = application {
                                 Icon(MaterialSymbols.Refresh, "重新检测已安装")
                             }
                         }
-                        IconButton(onClick = {
+                        FilledTonalIconButton(onClick = {
                             toolSearchVisible = !toolSearchVisible
                             if (!toolSearchVisible) toolSearchQueryState = ""
                         }) {
@@ -218,13 +239,13 @@ fun main() = application {
                     }
                     if (selectedNavIndex == 2) {
                         // 终端页：新建会话按钮
-                        IconButton(onClick = {
+                        FilledTonalIconButton(onClick = {
                             TerminalSessionManager.createAndActivateSession()
                         }) {
                             Icon(MaterialSymbols.Add, "新建会话")
                         }
                         // 终端页：清除所有标签页按钮
-                        IconButton(
+                        FilledTonalIconButton(
                             onClick = {
                                 TerminalSessionManager.clearAllSessions()
                             },
@@ -318,6 +339,11 @@ fun main() = application {
                             WallpaperState.customBgFileName = newFile
                             persist()
                         },
+                        useWavyProgress = useWavyProgress,
+                        onUseWavyProgressChange = { newVal ->
+                            useWavyProgress = newVal
+                            persist()
+                        },
                         toolCommandSessionMode = toolCommandSessionMode,
                         onToolCommandSessionModeChange = { newMode ->
                             toolCommandSessionMode = newMode
@@ -334,6 +360,7 @@ fun main() = application {
                     5 -> AboutScreen()
                     else -> HomeScreen()
                 }
+            }
             }
         }
     }

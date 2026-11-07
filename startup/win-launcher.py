@@ -172,80 +172,86 @@ def show_yes_no_box(title, message):
     result = ctypes.windll.user32.MessageBoxW(0, message, title, MB_YESNO | MB_ICONQUESTION)
     return result == IDYES
 
-def get_file_sha256(filepath):
-    """计算文件的 SHA256 哈希值"""
+if getattr(sys, "frozen", False):
+    # PyInstaller 打包后的 exe 所在目录
+    APP_DIR = os.path.dirname(os.path.abspath(sys.executable))
+else:
+    # 直接从源码运行启动器时，使用脚本所在目录
+    APP_DIR = os.path.dirname(os.path.abspath(__file__))
+JAR_PATH = os.path.join(APP_DIR, "binary", "NTB-shrunk.jar")
+HASH_FILE = os.path.join(APP_DIR, "binary_sha256.sha256")
+
+def _read_expected_sha256():
+    """
+    读取 binary_sha256.sha256 中的 SHA256。
+    兼容两种格式：
+      <64位哈希>
+      <64位哈希>  <文件名>
+    忽略空行和 # 注释。
+    """
+    try:
+        with open(HASH_FILE, "r", encoding="utf-8") as f:
+            for raw_line in f:
+                line = raw_line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                token = line.split()[0].lower()
+                if re.fullmatch(r"[0-9a-f]{64}", token):
+                    return token
+        return None
+    except Exception:
+        return None
+
+def _file_sha256(filepath):
     try:
         sha256_hash = hashlib.sha256()
         with open(filepath, "rb") as f:
-            # 分块读取，避免大文件占用过多内存
-            for byte_block in iter(lambda: f.read(4096), b""):
+            for byte_block in iter(lambda: f.read(1024 * 1024), b""):
                 sha256_hash.update(byte_block)
-        return sha256_hash.hexdigest().upper()
+        return sha256_hash.hexdigest().lower()
     except Exception:
-        return None
-
-def read_expected_sha256():
-    """从 binary_sha256.sha256 文件中读取期望的 SHA256 值"""
-    hash_file_path = "./binary_sha256.sha256"
-    
-    # 检查哈希文件是否存在
-    if not os.path.exists(hash_file_path):
-        show_message_box(
-            "校验文件缺失",
-            f"找不到校验文件：{hash_file_path}\n\n"
-            f"请确保该文件存在于程序所在目录。"
-        )
-        return None
-    
-    try:
-        with open(hash_file_path, "r") as f:
-            content = f.read().strip()
-            # 只提取 SHA256 值（不带前缀和后缀）
-            return content.upper()
-    except Exception:
-        show_message_box(
-            "校验文件错误",
-            f"无法读取校验文件：{hash_file_path}"
-        )
         return None
 
 def check_jar_integrity():
-    jar_path = "./binary/NTB-shrunk.jar"
-    
-    # 检查文件是否存在
-    if not os.path.exists(jar_path):
+    """基础 SHA256 校验：只用于发现下载损坏或打包错误。"""
+    if not os.path.exists(JAR_PATH):
         show_message_box(
             "文件缺失",
-            f"找不到主程序文件：{jar_path}\n\n请确保该文件存在于程序所在目录或重新安装。"
+            f"找不到主程序文件：{JAR_PATH}\n\n请重新安装或检查安装包完整性。"
         )
         return False
-    
-    # 读取期望的 SHA256 值
-    expected_hash = read_expected_sha256()
-    if expected_hash is None:
+
+    expected = _read_expected_sha256()
+    if expected is None:
+        show_message_box(
+            "校验文件缺失",
+            f"找不到或无法读取校验文件：{HASH_FILE}\n\n请重新安装。"
+        )
         return False
-    
-    # 计算 SHA256
-    calculated_hash = get_file_sha256(jar_path)
-    
-    if calculated_hash is None:
+
+    actual = _file_sha256(JAR_PATH)
+    if actual is None:
         show_message_box(
             "校验错误",
-            f"无法读取或计算 {jar_path} 的 SHA256 值。"
+            f"无法读取主程序文件：{JAR_PATH}"
         )
         return False
-    
-    if calculated_hash == expected_hash:
-        return True
-    else:
+
+    if actual != expected:
         show_message_box(
-            "校验失败",
-            f"文件 {jar_path} 的哈希值校验失败，\n\n"
-            f"期望 SHA256：{expected_hash}\n"
-            f"实际 SHA256：{calculated_hash}\n\n"
-            f"文件可能损坏或被篡改，重新安装以解决此问题。"
+            "文件校验失败",
+            f"主程序文件的 SHA256 与校验文件不一致。\n\n"
+            f"期望：{expected}\n"
+            f"实际：{actual}\n\n"
+            f"文件可能损坏或打包错误，请重新下载安装包。"
         )
         return False
+
+    return True
+
+def _skip_integrity():
+    """开发构建可通过 --skip-integrity 或 NTB_SKIP_INTEGRITY=1 跳过基础校验。"""
+    return "--skip-integrity" in sys.argv or os.environ.get("NTB_SKIP_INTEGRITY") == "1"
 
 def get_java_version():
     try:
@@ -347,11 +353,11 @@ def download_and_install_java(min_version):
 
 def run_jar():
     """运行 JAR 文件"""
-    # 首先检查 JAR 文件完整性和哈希值
-    if not check_jar_integrity():
+    # 基础完整性校验（可被开发构建跳过）
+    if not _skip_integrity() and not check_jar_integrity():
         sys.exit(1)
-    
-    # 然后检查 Java 环境（要求 Java 21+）
+
+    # 检查 Java 环境（要求 Java 21+）
     if check_java_version(21):
         try:
             # 隐藏窗口运行 Java JAR
@@ -360,7 +366,7 @@ def run_jar():
             startupinfo.wShowWindow = SW_HIDE
             
             subprocess.run(
-                ["java", "-jar", "./binary/NTB-shrunk.jar"],
+                ["java", "-jar", JAR_PATH],
                 creationflags=CREATE_NO_WINDOW,
                 startupinfo=startupinfo,
                 shell=False

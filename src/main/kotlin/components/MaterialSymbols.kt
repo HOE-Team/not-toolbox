@@ -11,6 +11,7 @@ import icons.robot_2
 import icons.brightness_empty
 import main.kotlin.icons.*
 import androidx.compose.ui.graphics.vector.ImageVector
+import icons.animation
 import icons.keyboard_arrow_down
 import icons.keyboard_arrow_right
 import icons.neurology
@@ -236,4 +237,7 @@ object MaterialSymbols {
 
     /**Save**/
     val Save: ImageVector = save
+
+    /**Animation**/
+    val Animation: ImageVector = animation
 }
