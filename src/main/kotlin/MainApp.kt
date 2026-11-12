@@ -208,9 +208,17 @@ fun main() = application {
                 },
                 topBarTitle = topBarTitle,
                 topBarProgress = {
-                    // 用户点了「立即显示列表」后，用非确定性线性指示器继续提示后台仍在检查
+                    // 包 > 推荐 / 包管理的更新检查提示统一放在顶栏，其他页面不显示
                     val updateState by UpdateChecker.state.collectAsState()
-                    if (updateState.status == UpdateCheckStatus.CHECKING && updateState.dismissed) {
+                    // “推荐”页已经显示更新检查加载页时，不再重复显示顶栏进度；
+                    // 用户选择“立即显示列表”后，才用顶栏指示器提示仍在检查。
+                    val showPackageCheckProgress = selectedNavIndex == 1 &&
+                        updateState.status == UpdateCheckStatus.CHECKING &&
+                        (
+                            toolSourceTab == 2 ||
+                                (toolSourceTab == 0 && updateState.dismissed)
+                            )
+                    if (showPackageCheckProgress) {
                         if (LocalWavyProgress.current) {
                             LinearWavyProgressIndicator(
                                 modifier = Modifier.fillMaxWidth(),

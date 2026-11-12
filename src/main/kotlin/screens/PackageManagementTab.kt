@@ -95,7 +95,6 @@ fun PackageManagementTab(
         checkState.supported &&
         !checkState.failed
     val checkPending = refreshing || !sameManager || checkState.status == UpdateCheckStatus.IDLE
-    val hasAnyUpdates = updatesReady && checkState.updatable.isNotEmpty()
 
     // 进入“包管理”页或点击顶栏刷新时立即重查；在结果返回前不显示更新按钮。
     LaunchedEffect(refreshToken, manager) {
@@ -182,6 +181,14 @@ fun PackageManagementTab(
             .filter { entryMatches(it, activeQuery) }
             .sortedBy { it.displayName.lowercase() }
     }
+
+    // “可升级”数量只统计当前筛选后实际显示的已安装包，而不是全部已安装包
+    val visibleUpdatableCount = if (!updatesReady) {
+        0
+    } else {
+        installedEntries.count { it.nativeName.lowercase() in checkState.updatable }
+    }
+    val hasAnyUpdates = visibleUpdatableCount > 0
 
     val installedNames = remember(snapshot) {
         snapshot?.packages?.keys.orEmpty()
@@ -305,7 +312,7 @@ fun PackageManagementTab(
                     if (hasAnyUpdates) {
                         Spacer(modifier = Modifier.width(8.dp))
                         StatusPill(
-                            text = "可升级 " + checkState.updatable.size,
+                            text = "可升级 " + visibleUpdatableCount,
                             containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                             contentColor = MaterialTheme.colorScheme.onTertiaryContainer
                         )

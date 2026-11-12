@@ -104,6 +104,8 @@ fun ToolsScreen(
     var remotePackages by remember { mutableStateOf<List<PackageInfo>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    // 推荐列表是否已成功获取；远程失败时不能继续做包管理器更新扫描
+    var listReady by remember { mutableStateOf(isDebug) }
     var reloadTrigger by remember { mutableStateOf(0) }
     var offlineItems by remember { mutableStateOf(loadOfflineItems()) }
     var showLinuxInputDialog by remember { mutableStateOf(false) }
@@ -147,11 +149,11 @@ fun ToolsScreen(
 
     // 已安装检测：仅在本进程确实需要时执行（首次进入 / 切换包管理器 / 缓存被删除）。
     // 反复进出工具页会命中进程内快照，既不读盘也不扫描。
-    LaunchedEffect(effectiveManager) {
+    LaunchedEffect(effectiveManager, listReady, sourceTab) {
         PackageDetector.detectIfNeeded(effectiveManager)
-        // 检测完成后再检查可用更新（顺序执行，避免两段网络请求叠加）
-        // 包管理页进入时会立即强制重查，这里避免重复检查
-        if (sourceTab != 2) {
+        // 只有推荐列表成功获取后才检查可用更新；列表失败时直接显示错误。
+        // 快捷方式页不检查更新；包管理页进入时会立即强制重查，这里避免重复检查。
+        if (sourceTab == 0 && listReady) {
             UpdateChecker.checkIfNeeded(effectiveManager)
         }
     }
@@ -160,9 +162,10 @@ fun ToolsScreen(
     val detection by PackageDetector.state.collectAsState()
     val isDetecting = detection.status == DetectionStatus.SCANNING
 
-    // 更新检查中：先转圈（带「立即显示列表」），用户可选择提前展示卡片
+    // 更新检查中：顶栏显示非确定进度；“推荐”内容区显示检查加载页
     val checkState by UpdateChecker.state.collectAsState()
-    val checkingUpdates = checkState.status == UpdateCheckStatus.CHECKING
+    val checkingUpdates = checkState.status == UpdateCheckStatus.CHECKING &&
+        checkState.manager == effectiveManager
     var warningSnackbarVisible by remember { mutableStateOf(false) }
 
     // 检测失败（如离线导致 RPM/Winget 命令不可用）时提示用户
@@ -196,17 +199,32 @@ fun ToolsScreen(
     LaunchedEffect(selectedPackageManager, isDebug, useProxy, proxyUrl, reloadTrigger) {
         if (!isDebug) {
             isLoading = true
+            listReady = false
             errorMessage = null
+            remotePackages = emptyList()
             val manager = if (selectedPackageManager != PackageManagerType.UNKNOWN)
                 selectedPackageManager else PackageManagerUtils.detectPackageManager()
             if (manager != PackageManagerType.UNKNOWN) {
                 val result = PackageListLoader.fetchPackagesFromRemote(manager, if (useProxy) proxyUrl else null)
                 result.fold(
-                    onSuccess = { packages -> remotePackages = packages; errorMessage = null },
-                    onFailure = { error -> errorMessage = error.message ?: "未知错误" }
+                    onSuccess = { packages ->
+                        remotePackages = packages
+                        errorMessage = null
+                        listReady = true
+                    },
+                    onFailure = { error ->
+                        remotePackages = emptyList()
+                        errorMessage = error.message ?: "未知错误"
+                        listReady = false
+                    }
                 )
-            } else errorMessage = "未检测到包管理器"
+            } else {
+                errorMessage = "未检测到包管理器"
+                listReady = false
+            }
             isLoading = false
+        } else {
+            listReady = true
         }
     }
 
@@ -288,8 +306,10 @@ fun ToolsScreen(
             // 全局搜索模式：隐藏 Tabs，显示所有匹配项
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 when {
+                    isLoading -> LoadingHint()
+                    !isDebug && errorMessage != null && remotePackages.isEmpty() ->
+                        EmptyPackageListHint(errorMessage, onRetry = { reloadTrigger++ })
                     isDetecting -> DetectingHint()
-                    checkingUpdates && !checkState.dismissed -> CheckingUpdatesHint(onShowNow = { UpdateChecker.dismiss() })
                     globalResults.isEmpty() -> EmptySearchHint()
                     else -> GlobalResultGrid(
                         results = globalResults,
@@ -339,8 +359,11 @@ fun ToolsScreen(
                 Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp)) {
                     when {
                         isLoading -> LoadingHint()
+                        !isDebug && errorMessage != null && remotePackages.isEmpty() ->
+                            EmptyPackageListHint(errorMessage, onRetry = { reloadTrigger++ })
                         isDetecting -> DetectingHint()
-                        checkingUpdates && !checkState.dismissed -> CheckingUpdatesHint(onShowNow = { UpdateChecker.dismiss() })
+                        checkingUpdates && !checkState.dismissed ->
+                            CheckingUpdatesHint(onShowNow = { UpdateChecker.dismiss() })
                         filteredPackages.isEmpty() -> EmptyPackageListHint(errorMessage, onRetry = { reloadTrigger++ })
                         categories.isNotEmpty() && selectedTab < categories.size -> {
                             val tools = (packagesByCategory[categories[selectedTab]] ?: emptyList())
@@ -703,14 +726,6 @@ private fun LoadingHint() {
     }
 }
 
-/** 检测已安装包期间占位：显示加载动画并隐藏卡片 */
-@Composable
-private fun DetectingHint() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        ExpressiveLoadingState(label = "正在检测已安装的应用", modifier = Modifier.widthIn(max = 420.dp))
-    }
-}
-
 /** 检查可用更新期间占位：显示加载动画，并提供「立即显示列表」提前查看卡片 */
 @Composable
 private fun CheckingUpdatesHint(onShowNow: () -> Unit) {
@@ -724,6 +739,14 @@ private fun CheckingUpdatesHint(onShowNow: () -> Unit) {
                 }
             }
         )
+    }
+}
+
+/** 检测已安装包期间占位：显示加载动画并隐藏卡片 */
+@Composable
+private fun DetectingHint() {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        ExpressiveLoadingState(label = "正在检测已安装的应用", modifier = Modifier.widthIn(max = 420.dp))
     }
 }
 
