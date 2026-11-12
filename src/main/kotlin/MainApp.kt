@@ -22,6 +22,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import components.AppScaffold
+import components.BackgroundTaskDialog
 import components.MaterialSymbols
 import components.NavRail
 import config.*
@@ -95,6 +96,11 @@ fun main() = application {
         }
 
         var selectedNavIndex by remember { mutableStateOf(0) }
+        var backgroundDialogVisible by remember { mutableStateOf(false) }
+        val backgroundTasks by BackgroundTaskManager.tasks.collectAsState()
+        LaunchedEffect(backgroundTasks.isEmpty()) {
+            if (backgroundTasks.isEmpty()) backgroundDialogVisible = false
+        }
 
         // 包页搜索状态：Search 按钮在 TopBar，搜索框在包页内容区
         var toolSearchVisible by remember { mutableStateOf(false) }
@@ -192,7 +198,14 @@ fun main() = application {
         AppTheme(darkTheme = isDark, seedHex = seedHex) {
             CompositionLocalProvider(LocalWavyProgress provides useWavyProgress) {
             AppScaffold(
-                startBar = { NavRail(selectedIndex = selectedNavIndex, onSelection = { selectedNavIndex = it }) },
+                startBar = {
+                    NavRail(
+                        selectedIndex = selectedNavIndex,
+                        onSelection = { selectedNavIndex = it },
+                        backgroundTaskActive = backgroundTasks.isNotEmpty(),
+                        onBackgroundTaskClick = { backgroundDialogVisible = true }
+                    )
+                },
                 topBarTitle = topBarTitle,
                 topBarProgress = {
                     // 用户点了「立即显示列表」后，用非确定性线性指示器继续提示后台仍在检查
@@ -376,6 +389,17 @@ fun main() = application {
                     else -> HomeScreen()
                 }
             }
+            }
+            if (backgroundDialogVisible && backgroundTasks.isNotEmpty()) {
+                BackgroundTaskDialog(
+                    tasks = backgroundTasks,
+                    onClose = {
+                        backgroundDialogVisible = false
+                        BackgroundTaskManager.clearFinished()
+                    },
+                    onCancel = { id -> BackgroundTaskManager.cancel(id) },
+                    onRemove = { id -> BackgroundTaskManager.remove(id) }
+                )
             }
         }
     }

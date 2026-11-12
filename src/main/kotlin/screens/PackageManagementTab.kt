@@ -28,6 +28,7 @@ import components.MaterialSymbols
 import components.StatusPill
 import components.TonalIcon
 import kotlinx.coroutines.launch
+import utils.BackgroundTaskManager
 import utils.InstalledSnapshot
 import utils.PackageDetector
 import utils.PackageInfo
@@ -231,8 +232,8 @@ fun PackageManagementTab(
                 onClick = { submitSearch() },
                 enabled = queryText.isNotBlank() && !searching && manager != PackageManagerType.UNKNOWN,
                 shape = CircleShape,
-                modifier = Modifier.height(56.dp),
-                contentPadding = PaddingValues(horizontal = 14.dp)
+                modifier = Modifier.size(56.dp),
+                contentPadding = PaddingValues(0.dp)
             ) {
                 if (searching) {
                     CircularProgressIndicator(
@@ -240,10 +241,12 @@ fun PackageManagementTab(
                         strokeWidth = 2.dp
                     )
                 } else {
-                    Icon(MaterialSymbols.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(
+                        MaterialSymbols.Search,
+                        contentDescription = "搜索",
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("搜索")
             }
         }
 
@@ -426,8 +429,22 @@ fun PackageManagementTab(
                     }
                 }
             },
-            onConfirm = { TerminalSessionManager.executeCommandAndWait(updateAllCommand) },
-            onSucceeded = { globalUpdateSucceeded = true }
+            onConfirm = {
+                TerminalSessionManager.executePackageCommandAndWait(updateAllCommand, "包管理 · 全部软件包")
+            },
+            onSucceeded = { globalUpdateSucceeded = true },
+            onBackground = { sid ->
+                BackgroundTaskManager.start(
+                    title = "全部软件包",
+                    actionLabel = "更新",
+                    command = updateAllCommand,
+                    sessionId = sid,
+                    onSuccess = {
+                        PackageDetector.rescanSilently(manager)
+                        UpdateChecker.recheckSilently(manager)
+                    }
+                )
+            }
         )
     }
 }
@@ -630,8 +647,37 @@ private fun PackageManagementRow(
                     }
                 }
             },
-            onConfirm = { TerminalSessionManager.executeCommandAndWait(command) },
-            onSucceeded = { succeeded = true }
+            onConfirm = {
+                TerminalSessionManager.executePackageCommandAndWait(
+                    command,
+                    "包管理 · " + entry.displayName
+                )
+            },
+            onSucceeded = { succeeded = true },
+            onBackground = { sid ->
+                BackgroundTaskManager.start(
+                    title = entry.displayName,
+                    actionLabel = when (action) {
+                        PackageAction.INSTALL -> "安装"
+                        PackageAction.UPDATE -> "更新"
+                        PackageAction.UNINSTALL -> "卸载"
+                    },
+                    command = command,
+                    sessionId = sid,
+                    onSuccess = {
+                        when (action) {
+                            PackageAction.INSTALL ->
+                                PackageDetector.onPackageInstalled(manager, entry.nativeName)
+                            PackageAction.UNINSTALL ->
+                                PackageDetector.onPackageUninstalled(manager, entry.nativeName)
+                            PackageAction.UPDATE -> {
+                                PackageDetector.rescanSilently(manager)
+                                UpdateChecker.recheckSilently(manager)
+                            }
+                        }
+                    }
+                )
+            }
         )
     }
 }

@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import java.awt.Desktop
 import java.net.URI
+import utils.BackgroundTaskManager
 import utils.PackageManagerUtils
 import utils.PackageManagerType
 import utils.CommonPackages
@@ -1003,7 +1004,12 @@ fun ToolCard(
             action = action,
             command = pendingCommand,
             onDismiss = { pendingAction = null },
-            onConfirm = { TerminalSessionManager.executeCommandAndWait(pendingCommand) },
+            onConfirm = {
+                TerminalSessionManager.executePackageCommandAndWait(
+                    pendingCommand,
+                    "包管理 · " + tool.name
+                )
+            },
             onSucceeded = {
                 when (action) {
                     PackageAction.INSTALL ->
@@ -1017,6 +1023,32 @@ fun ToolCard(
                         UpdateChecker.recheckSilently(packageManager)
                     }
                 }
+            },
+            onBackground = { sid ->
+                BackgroundTaskManager.start(
+                    title = tool.name,
+                    actionLabel = when (action) {
+                        PackageAction.INSTALL -> "安装"
+                        PackageAction.UPDATE -> "更新"
+                        PackageAction.UNINSTALL -> "卸载"
+                    },
+                    command = pendingCommand,
+                    sessionId = sid,
+                    onSuccess = {
+                        when (action) {
+                            PackageAction.INSTALL -> packageName?.let {
+                                PackageDetector.onPackageInstalled(packageManager, it)
+                            }
+                            PackageAction.UNINSTALL -> packageName?.let {
+                                PackageDetector.onPackageUninstalled(packageManager, it)
+                            }
+                            PackageAction.UPDATE -> {
+                                PackageDetector.rescanSilently(packageManager)
+                                UpdateChecker.recheckSilently(packageManager)
+                            }
+                        }
+                    }
+                )
             }
         )
     }
@@ -1065,11 +1097,13 @@ fun PackageActionDialog(
     action: PackageAction,
     command: String,
     onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
-    onSucceeded: () -> Unit = {}
+    onConfirm: () -> Long,
+    onSucceeded: () -> Unit = {},
+    onBackground: ((Long) -> Unit)? = null
 ) {
     var dialogState by remember { mutableStateOf(PackageDialogState.CONFIRM) }
     var installSuccess by remember { mutableStateOf(false) }
+    var sessionId by remember { mutableStateOf<Long?>(null) }
 
     // 各动作的文案
     val confirmTitle = when (action) {
@@ -1106,22 +1140,39 @@ fun PackageActionDialog(
     when (dialogState) {
         PackageDialogState.CONFIRM -> AlertDialog(onDismissRequest = onDismiss, shape = MaterialTheme.shapes.extraLarge, title = { Text(confirmTitle) },
             text = { Column { Text(confirmLead); Spacer(Modifier.height(8.dp)); Text(command, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.shapes.medium).padding(10.dp)); Spacer(Modifier.height(8.dp)); Text(confirmWarning, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) } },
-            confirmButton = { Button(onClick = { onConfirm(); dialogState = PackageDialogState.PROGRESS }) { Text(confirmTitle) } },
+            confirmButton = {
+                Button(onClick = {
+                    sessionId = onConfirm()
+                    dialogState = PackageDialogState.PROGRESS
+                }) { Text(confirmTitle) }
+            },
             dismissButton = { OutlinedButton(onClick = onDismiss) { Text("取消") } })
         PackageDialogState.PROGRESS -> {
-            var output by remember { mutableStateOf("") }
-            var running by remember { mutableStateOf(false) }
-            LaunchedEffect(Unit) { TerminalSessionManager.outputFlow.collect { output = it } }
-            LaunchedEffect(Unit) {
+            val sid = sessionId
+            val session = remember(sid) {
+                sid?.let { TerminalSessionManager.getSession(it) }
+            }
+            var output by remember(sid) { mutableStateOf(session?.output?.value ?: "") }
+            var running by remember(sid) { mutableStateOf(session?.isRunning?.value ?: false) }
+            LaunchedEffect(sid) {
+                if (session != null) {
+                    session.output.collect { output = it }
+                } else {
+                    TerminalSessionManager.outputFlow.collect { output = it }
+                }
+            }
+            LaunchedEffect(sid) {
                 var sawRunning = false
                 var resultHandled = false
-                TerminalSessionManager.isRunning.collect { r ->
+                val runningFlow = session?.isRunning ?: TerminalSessionManager.isRunning
+                runningFlow.collect { r ->
                     running = r
                     if (r) {
                         sawRunning = true
                     } else if (sawRunning && !resultHandled) {
                         resultHandled = true
-                        installSuccess = TerminalSessionManager.lastExitCode.value == 0
+                        installSuccess = (session?.lastExitCode?.value
+                            ?: TerminalSessionManager.lastExitCode.value) == 0
                         if (installSuccess) onSucceeded()
                         dialogState = PackageDialogState.RESULT
                     }
@@ -1138,7 +1189,7 @@ fun PackageActionDialog(
                         // 发送输入行到活动会话（运行中的安装命令的 stdin）
                         val sendPendingInput: () -> Unit = {
                             if (pendingInput.isNotBlank()) {
-                                TerminalSessionManager.executeCommand(pendingInput)
+                                sid?.let { TerminalSessionManager.executeCommand(it, pendingInput) }
                                 pendingInput = ""
                             }
                         }
@@ -1161,7 +1212,7 @@ fun PackageActionDialog(
                                         if (event.type == KeyEventType.KeyDown &&
                                             event.key == Key.C && event.isCtrlPressed
                                         ) {
-                                            TerminalSessionManager.activeSessionId.value?.let {
+                                            sid?.let {
                                                 TerminalSessionManager.sendRawInput(it, "\u0003")
                                             }
                                             true
@@ -1242,7 +1293,28 @@ fun PackageActionDialog(
                         }
                     }
                 },
-                confirmButton = { if (running) OutlinedButton(onClick = { TerminalSessionManager.stopCurrentProcess() }) { Text("取消") } })
+                confirmButton = {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (running && onBackground != null && sid != null) {
+                            OutlinedButton(onClick = {
+                                onBackground(sid)
+                                onDismiss()
+                            }) { Text("后台运行") }
+                        }
+                        if (running) {
+                            OutlinedButton(onClick = {
+                                if (sid != null) {
+                                    TerminalSessionManager.stopSessionProcess(sid)
+                                } else {
+                                    TerminalSessionManager.stopCurrentProcess()
+                                }
+                            }) { Text("取消") }
+                        }
+                    }
+                })
         }
         PackageDialogState.RESULT -> AlertDialog(onDismissRequest = onDismiss, shape = MaterialTheme.shapes.extraLarge, title = { Text(resultTitle, style = MaterialTheme.typography.titleLarge) },
             text = { Text(resultText, textAlign = TextAlign.Center) },

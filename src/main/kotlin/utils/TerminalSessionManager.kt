@@ -439,6 +439,18 @@ object TerminalSessionManager {
     }
 
     /**
+     * 为包安装/卸载/更新单独创建一个会话并执行命令。
+     *
+     * 包操作可能同时进行多个，不能共用默认会话，否则后启动的命令会取消前一个。
+     */
+    fun executePackageCommandAndWait(command: String, title: String? = null): Long {
+        val s = createSession(title ?: "包管理")
+        setActiveSession(s.id)
+        executeCommandAndWait(s.id, command)
+        return s.id
+    }
+
+    /**
      * 在指定会话中执行命令并等待完成。
      */
     fun executeCommandAndWait(sessionId: Long, command: String, workingDirectory: String? = null) {
@@ -634,6 +646,11 @@ object TerminalSessionManager {
     fun stopCurrentProcess() {
         val id = _activeSessionId.value ?: return
         getSession(id)?.let { stopProcess(it) }
+    }
+
+    /** 停止指定会话的进程（多个包任务并行时使用）。 */
+    fun stopSessionProcess(sessionId: Long) {
+        getSession(sessionId)?.let { stopProcess(it) }
     }
 
     /**

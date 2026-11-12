@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -58,7 +59,9 @@ private val navEntries = listOf(
 @Composable
 fun NavRail(
     selectedIndex: Int = 0,
-    onSelection: (Int) -> Unit = {}
+    onSelection: (Int) -> Unit = {},
+    backgroundTaskActive: Boolean = false,
+    onBackgroundTaskClick: () -> Unit = {}
 ) {
     Surface(
         modifier = Modifier
@@ -89,6 +92,19 @@ fun NavRail(
                 }
             }
             Spacer(modifier = Modifier.weight(1f))
+            if (backgroundTaskActive) {
+                FilledTonalIconButton(
+                    onClick = onBackgroundTaskClick,
+                    shape = CircleShape
+                ) {
+                    Icon(
+                        imageVector = MaterialSymbols.Hourglass_Bottom,
+                        contentDescription = "后台任务",
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
         }
     }
 }
