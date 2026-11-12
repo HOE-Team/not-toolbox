@@ -42,7 +42,7 @@ private data class NavEntry(
 
 private val navEntries = listOf(
     NavEntry("概览", MaterialSymbols.Home),
-    NavEntry("工具", MaterialSymbols.Build),
+    NavEntry("包", MaterialSymbols.Package),
     NavEntry("终端", MaterialSymbols.Terminal),
     NavEntry("AI", MaterialSymbols.Robot2),
     NavEntry("设置", MaterialSymbols.Settings),

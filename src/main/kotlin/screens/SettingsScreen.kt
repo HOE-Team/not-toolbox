@@ -285,7 +285,7 @@ fun SettingsScreen(
         /* ---------------------------- 包管理器 ---------------------------- */
         SettingsSection(
             title = if (isWindows) "Windows 包管理器" else "Linux 包管理器",
-            subtitle = "工具页安装命令使用的包管理器",
+            subtitle = "包页安装命令使用的包管理器",
             icon = MaterialSymbols.Package2
         ) {
             SettingsRow(
@@ -455,8 +455,8 @@ fun SettingsScreen(
 
             SettingsRow(
                 icon = MaterialSymbols.Terminal2,
-                title = "工具指令会话模式",
-                subtitle = "工具页执行本地指令时如何创建终端会话"
+                title = "包页指令会话模式",
+                subtitle = "包页执行本地指令时如何创建终端会话"
             ) {
                 var sessionModeExpanded by remember { mutableStateOf(false) }
                 val currentMode = remember(toolCommandSessionMode) {

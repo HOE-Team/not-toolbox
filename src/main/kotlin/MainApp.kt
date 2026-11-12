@@ -96,11 +96,13 @@ fun main() = application {
 
         var selectedNavIndex by remember { mutableStateOf(0) }
 
-        // 工具页搜索状态：Search 按钮在 TopBar，搜索框在工具页内容区
+        // 包页搜索状态：Search 按钮在 TopBar，搜索框在包页内容区
         var toolSearchVisible by remember { mutableStateOf(false) }
         var toolSearchQueryState by remember { mutableStateOf("") }
-        // 工具页的一级标签（0=联机 / 1=本地），提升到此处以便 TopBar 根据它隐藏按钮
+        // 包页的一级标签（0=推荐 / 1=快捷方式 / 2=包管理），提升到此处以便 TopBar 根据它隐藏按钮
         var toolSourceTab by remember { mutableStateOf(0) }
+        // 顶栏刷新时递增，通知包管理页重新执行搜索
+        var packageRefreshToken by remember { mutableStateOf(0) }
 
         // 加载已持久化的设置
         val loaded = loadConfig()
@@ -179,7 +181,7 @@ fun main() = application {
         }
 
         val topBarTitle = when (selectedNavIndex) {
-            1 -> "工具"
+            1 -> "包"
             2 -> "终端"
             3 -> "AI助手"
             4 -> "设置"
@@ -213,28 +215,34 @@ fun main() = application {
                 },
                 topBarActions = {
                     if (selectedNavIndex == 1) {
-                        // 工具页：重新检测已安装的包，并重新检查可用更新
-                        // 切到「本地」（离线）标签页时隐藏该按钮
-                        if (toolSourceTab == 0) {
+                        // 包页：重新检测已安装的包，并重新检查可用更新
+                        // 推荐和包管理页显示；快捷方式页隐藏
+                        if (toolSourceTab == 0 || toolSourceTab == 2) {
                             FilledTonalIconButton(onClick = {
+                                packageRefreshToken++
                                 appScope.launch {
                                     val manager = if (selectedPackageManager != PackageManagerType.UNKNOWN)
                                         selectedPackageManager else PackageManagerUtils.detectPackageManager(force = true)
                                     PackageDetector.rescan(manager)
-                                    UpdateChecker.retryCheck(manager)
+                                    // 包管理页由页面内的 refreshToken 效果负责强制重查，避免重复
+                                    if (toolSourceTab != 2) {
+                                        UpdateChecker.retryCheck(manager)
+                                    }
                                 }
                             }) {
                                 Icon(MaterialSymbols.Refresh, "重新检测已安装")
                             }
                         }
-                        FilledTonalIconButton(onClick = {
-                            toolSearchVisible = !toolSearchVisible
-                            if (!toolSearchVisible) toolSearchQueryState = ""
-                        }) {
-                            Icon(
-                                if (toolSearchVisible) MaterialSymbols.Close else MaterialSymbols.Search,
-                                if (toolSearchVisible) "关闭搜索" else "搜索"
-                            )
+                        if (toolSourceTab != 2) {
+                            FilledTonalIconButton(onClick = {
+                                toolSearchVisible = !toolSearchVisible
+                                if (!toolSearchVisible) toolSearchQueryState = ""
+                            }) {
+                                Icon(
+                                    if (toolSearchVisible) MaterialSymbols.Close else MaterialSymbols.Search,
+                                    if (toolSearchVisible) "关闭搜索" else "搜索"
+                                )
+                            }
                         }
                     }
                     if (selectedNavIndex == 2) {
@@ -266,7 +274,14 @@ fun main() = application {
                         searchQuery = toolSearchQueryState,
                         onSearchQueryChange = { toolSearchQueryState = it },
                         sourceTab = toolSourceTab,
-                        onSourceTabChange = { toolSourceTab = it },
+                        packageRefreshToken = packageRefreshToken,
+                        onSourceTabChange = { newTab ->
+                            toolSourceTab = newTab
+                            if (newTab == 2) {
+                                toolSearchVisible = false
+                                toolSearchQueryState = ""
+                            }
+                        },
                         onNavigateToTerminal = { selectedNavIndex = 2 }
                     )
                     2 -> TerminalScreen()

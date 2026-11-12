@@ -94,6 +94,7 @@ fun ToolsScreen(
     onSearchQueryChange: (String) -> Unit = {},
     sourceTab: Int = 0,
     onSourceTabChange: (Int) -> Unit = {},
+    packageRefreshToken: Int = 0,
     onNavigateToTerminal: () -> Unit = {}
 ) {
     var selectedTab by rememberSaveable { mutableStateOf(0) }
@@ -148,7 +149,10 @@ fun ToolsScreen(
     LaunchedEffect(effectiveManager) {
         PackageDetector.detectIfNeeded(effectiveManager)
         // 检测完成后再检查可用更新（顺序执行，避免两段网络请求叠加）
-        UpdateChecker.checkIfNeeded(effectiveManager)
+        // 包管理页进入时会立即强制重查，这里避免重复检查
+        if (sourceTab != 2) {
+            UpdateChecker.checkIfNeeded(effectiveManager)
+        }
     }
 
     // 检测中：显示转圈并隐藏卡片
@@ -261,7 +265,7 @@ fun ToolsScreen(
                     DropdownMenu(expanded = filterMenuExpanded, onDismissRequest = { filterMenuExpanded = false }) {
                         ToolFilter.entries.forEach { f ->
                             DropdownMenuItem(
-                                text = { Text(when (f) { ToolFilter.ALL -> "全部"; ToolFilter.ONLINE -> "在线"; ToolFilter.OFFLINE -> "离线" }) },
+                                text = { Text(when (f) { ToolFilter.ALL -> "全部"; ToolFilter.ONLINE -> "推荐"; ToolFilter.OFFLINE -> "快捷方式" }) },
                                 trailingIcon = { if (toolFilter == f) Icon(MaterialSymbols.Check, contentDescription = null) },
                                 onClick = { toolFilter = f; filterMenuExpanded = false }
                             )
@@ -311,8 +315,9 @@ fun ToolsScreen(
             // 非搜索模式：Expressive 胶囊式一级导航
             ExpressivePillTabs(
                 tabs = listOf(
-                    PillTab("联机", MaterialSymbols.Link),
-                    PillTab("本地", MaterialSymbols.LinkOff)
+                    PillTab("推荐", MaterialSymbols.Editor_Choice),
+                    PillTab("快捷方式", MaterialSymbols.Arrow_Outward),
+                    PillTab("包管理", MaterialSymbols.Package)
                 ),
                 selectedIndex = sourceTab,
                 onSelect = onSourceTabChange,
@@ -320,7 +325,7 @@ fun ToolsScreen(
             )
 
             if (sourceTab == 0 && showOnline) {
-                // 联机模式
+                // 推荐模式
                 if (categories.isNotEmpty()) {
                     ExpressivePillTabs(
                         tabs = categories.map { PillTab(it) },
@@ -347,7 +352,7 @@ fun ToolsScreen(
                     }
                 }
             } else if (sourceTab == 1 && showOffline) {
-                // 本地模式
+                // 快捷方式模式
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     when {
                         offlineItems.isEmpty() -> EmptyOfflineHint(
@@ -430,6 +435,21 @@ fun ToolsScreen(
                         WarningAwareSnackbar(data, warningSnackbarVisible)
                     }
                 }
+            } else if (sourceTab == 2) {
+                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    PackageManagementTab(
+                        catalog = currentPackages,
+                        manager = effectiveManager,
+                        snapshot = detection.snapshot,
+                        isDetecting = isDetecting,
+                        refreshToken = packageRefreshToken,
+                        detectionMessage = detectionMessage,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter)) { data ->
+                        WarningAwareSnackbar(data, warningSnackbarVisible)
+                    }
+                }
             }
         }
     }
@@ -484,7 +504,7 @@ private fun GlobalResultGrid(
 
         // 联机分组标题（存在在线结果时显示）
         if (onlineResults.isNotEmpty()) {
-            SectionTitle("联机")
+            SectionTitle("推荐")
             onlineResults.chunked(2).forEach { row ->
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     row.forEach { r ->
@@ -499,7 +519,7 @@ private fun GlobalResultGrid(
 
         // 离线分组标题（存在离线结果时显示）
         if (offlineResults.isNotEmpty()) {
-            SectionTitle("离线")
+            SectionTitle("快捷方式")
             offlineResults.chunked(2).forEach { row ->
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     row.forEach { r ->
@@ -542,9 +562,9 @@ private fun EmptyOfflineHint(isWindows: Boolean, onAddPathClick: () -> Unit, onA
             icon = MaterialSymbols.Terminal2,
             title = "列表为空",
             message = if (isWindows) {
-                "添加一个本地可执行程序或指令来使用离线功能"
+                "添加一个本地可执行程序或指令来使用快捷方式"
             } else {
-                "添加一个指令来使用离线功能"
+                "添加一个指令来使用快捷方式"
             },
             actions = {
                 if (isWindows) {
@@ -615,7 +635,7 @@ private fun LocalToolCard(item: OfflineItem, onRun: () -> Unit, onDelete: () -> 
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = if (isPath) "本地可执行文件" else "离线指令",
+                        text = if (isPath) "可执行文件" else "快捷指令",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -658,7 +678,7 @@ private fun LinuxCommandInputDialog(initialValue: String = "", isEdit: Boolean =
         title = { Text(if (isEdit) "修改指令" else "添加指令") },
         text = {
             Column {
-                Text("输入一个快捷指令，用于离线执行:")
+                Text("输入一个快捷指令，用于快捷执行:")
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedTextField(
                     value = cmd,
@@ -741,7 +761,7 @@ private fun EmptySearchHint() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         ExpressiveEmptyState(
             icon = MaterialSymbols.SearchOff,
-            title = "没有匹配的工具",
+            title = "没有匹配的软件包",
             message = "尝试更换搜索关键词",
             modifier = Modifier.widthIn(max = 460.dp)
         )

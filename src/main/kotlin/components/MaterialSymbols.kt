@@ -12,6 +12,8 @@ import icons.brightness_empty
 import main.kotlin.icons.*
 import androidx.compose.ui.graphics.vector.ImageVector
 import icons.animation
+import icons.arrow_outward
+import icons.editor_choice
 import icons.keyboard_arrow_down
 import icons.keyboard_arrow_right
 import icons.neurology
@@ -157,6 +159,9 @@ object MaterialSymbols {
     /** 包裹 */
     val Package2: ImageVector = package_2
 
+    /** 包管理 */
+    val Package: ImageVector = package_2
+
     /** 以太网设置 */
     val SettingsEthernet: ImageVector = settings_ethernet
 
@@ -240,4 +245,13 @@ object MaterialSymbols {
 
     /**Animation**/
     val Animation: ImageVector = animation
+
+    /**Arrow Outward**/
+    val Arrow_Outward: ImageVector = arrow_outward
+
+    /**Editor Choice**/
+    val Editor_Choice: ImageVector = editor_choice
+
+    /**Hourglass Bottom**/
+    val Hourglass_Bottom: ImageVector = hourglass_bottom
 }

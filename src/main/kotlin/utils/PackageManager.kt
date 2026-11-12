@@ -288,20 +288,36 @@ object PackageManagerUtils {
     }
     
     /**
-     * 获取包管理器的搜索命令
+     * 获取包管理器的搜索命令。
+     *
+     * 查询词会先移除 shell 特殊字符并加引号，避免用户输入被当作命令执行。
      */
     fun getSearchCommand(manager: PackageManagerType, query: String): String? {
+        val quoted = quoteSearchQuery(query) ?: return null
         return when (manager) {
-            PackageManagerType.APT -> "apt-cache search $query"
-            PackageManagerType.DNF -> "dnf search $query"
-            PackageManagerType.PACMAN -> "pacman -Ss $query"
-            PackageManagerType.ZYPPER -> "zypper search $query"
-            PackageManagerType.EMERGE -> "emerge --search $query"
-            PackageManagerType.NIX -> "nix-env -qaP | grep $query"
-            PackageManagerType.WINGET -> "winget search $query"
-            PackageManagerType.SCOOP -> "scoop search $query"
-            PackageManagerType.CHOCOLATEY -> "choco search $query"
+            PackageManagerType.APT -> "apt-cache search $quoted"
+            PackageManagerType.DNF -> "dnf search $quoted"
+            PackageManagerType.PACMAN -> "pacman -Ss $quoted"
+            PackageManagerType.ZYPPER -> "zypper search $quoted"
+            PackageManagerType.EMERGE -> "emerge --search $quoted"
+            PackageManagerType.NIX -> "nix-env -qaP | grep $quoted"
+            PackageManagerType.WINGET -> "winget search --accept-source-agreements --disable-interactivity $quoted"
+            PackageManagerType.SCOOP -> "scoop search $quoted"
+            PackageManagerType.CHOCOLATEY -> "choco search $quoted"
             PackageManagerType.UNKNOWN -> null
+        }
+    }
+
+    private fun quoteSearchQuery(raw: String): String? {
+        val cleaned = raw
+            .replace(Regex("[\r\n]"), " ")
+            .filter { it.isLetterOrDigit() || it.isWhitespace() || it in "._-+@/" }
+            .trim()
+        if (cleaned.isBlank()) return null
+        return if (System.getProperty("os.name").lowercase().contains("windows")) {
+            "\"" + cleaned + "\""
+        } else {
+            "'" + cleaned.replace("'", "'\\''") + "'"
         }
     }
     
