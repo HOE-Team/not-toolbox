@@ -17,6 +17,7 @@ NTB 启动器用于基础 SHA256 完整性校验、环境检查，并使用 java
     import ctypes
     import hashlib
     import os
+    import platform
     ```
 
 **基础校验**：
@@ -46,6 +47,15 @@ pyinstaller --onefile win-launcher.py
 ```
 更多打包参数请在 shell 键入`pyinstaller --help`查看，如需更改图标，请将你的新图标命名为 logo.ico 并放入 ./res-py 目录，如需更改应用属性，请修改 ./res-py/vinfo.txt。
 
+**Windows ARM64**：
+- `win-launcher-pyi.bat` 会自动读取当前 Python 的架构，并支持显式指定：
+  ```cmd
+  win-launcher-pyi.bat x64
+  win-launcher-pyi.bat arm64
+  ```
+- PyInstaller 不能跨架构编译；构建 ARM64 启动器时，必须使用 ARM64 版 Python 和 PyInstaller，在 Windows ARM64 上运行。
+- 启动器会按系统架构选择 x64/ARM64 的 Java JRE 下载地址；如果当前 Java 架构与系统不一致，会提示用户确认。
+
 **连同 jar 文件一同打包为安装程序**： 
 > [!NOTE]
 > 你的计算机需要安装InnoSetup 6.x
@@ -53,6 +63,10 @@ pyinstaller --onefile win-launcher.py
 在命令行执行
 ```cmd
 iscc pack-exe.iss
+```
+ARM64 安装包：
+```cmd
+iscc /DTargetArch=arm64 pack-exe.iss
 ```
 若需修改安装程序的信息，请修改pack-exe.iss
 

@@ -1,5 +1,23 @@
 ; NOT Toolbox Installer Script
 ; Inno Setup 6.7.0
+;
+; 默认构建 x64 安装包。ARM64 安装包使用：
+;   ISCC.exe /DTargetArch=arm64 pack-exe.iss
+;
+; 注意：ARM64 安装包仍应先在 ARM64 Windows 上用 ARM64 Python 运行
+; win-launcher-pyi.bat，确保 pyi\NTB\NTB.exe 是 ARM64 版本。
+
+#ifndef TargetArch
+  #define TargetArch "x64"
+#endif
+
+#if TargetArch == "arm64"
+  #define TargetArchId "arm64"
+  #define TargetSetupSuffix "win_arm64"
+#else
+  #define TargetArchId "x64"
+  #define TargetSetupSuffix "win_x86-64"
+#endif
 
 [Setup]
 AppId={{3189BC08-A081-436D-B344-A535CD722811}}
@@ -16,7 +34,9 @@ LicenseFile=
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 OutputDir=.\installer
-OutputBaseFilename=NOT_Toolbox_Setup
+OutputBaseFilename=not_toolbox_setup_{#TargetSetupSuffix}
+ArchitecturesAllowed={#TargetArchId}
+ArchitecturesInstallIn64BitMode={#TargetArchId}
 SetupIconFile=.\res-py\logo-install.ico
 Compression=lzma2
 SolidCompression=yes
@@ -24,7 +44,7 @@ WizardStyle=modern
 DisableProgramGroupPage=no
 UninstallDisplayIcon={app}\logo-uninstall.ico
 AppCopyright=Copyright (C) 2026 HOE Team. 保留部分权利。
-VersionInfoVersion=1.0.6.2
+VersionInfoVersion=1.0.6.5
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

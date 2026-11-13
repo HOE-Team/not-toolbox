@@ -19,6 +19,33 @@ repositories {
     maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
 }
 
+// ===========================================================================
+// 目标平台 build variant
+//
+// - windows：只带 Windows x64 + ARM64 的 Skiko 原生库
+// - linux  ：只带 Linux x64 + ARM64 的 Skiko 原生库
+// - all    ：同时带 Windows / Linux 两边的原生库，生成跨平台 JAR
+//
+// 用法：
+//   ./gradlew fatJar -PntbPlatform=windows
+//   ./gradlew fatJar -PntbPlatform=linux
+//   ./gradlew fatJar -PntbPlatform=all
+// ===========================================================================
+val ntbPlatform = providers.gradleProperty("ntbPlatform")
+    .orElse("all")
+    .get()
+    .lowercase()
+require(ntbPlatform in setOf("windows", "linux", "all")) {
+    "ntbPlatform 必须是 windows、linux 或 all，当前为：$ntbPlatform"
+}
+
+val skikoVersion = "0.144.6"
+val skikoRuntimes = when (ntbPlatform) {
+    "windows" -> listOf("windows-x64", "windows-arm64")
+    "linux" -> listOf("linux-x64", "linux-arm64")
+    else -> listOf("windows-x64", "windows-arm64", "linux-x64", "linux-arm64")
+}
+
 dependencies {
     // ProGuard 压缩器（仅构建期使用）
     proguardConfiguration("com.guardsquare:proguard-base:7.9.1")
@@ -32,10 +59,11 @@ dependencies {
     implementation("org.jetbrains.compose.animation:animation:1.11.1")
     // Compose Multiplatform 1.11.1 对应的 skiko 版本（0.144.x）。
     // 注意：不能显式固定为旧版（如 0.8.x），否则与 Compose/Skiko 原生运行时不匹配。
-    implementation("org.jetbrains.skiko:skiko-awt:0.144.6")
-    // Skiko 原生运行时库（Windows/Linux），否则 fat JAR 缺少 skiko-*.dll/.so 会无法启动
-    implementation("org.jetbrains.skiko:skiko-awt-runtime-windows-x64:0.144.6")
-    implementation("org.jetbrains.skiko:skiko-awt-runtime-linux-x64:0.144.6")
+    implementation("org.jetbrains.skiko:skiko-awt:$skikoVersion")
+    // Skiko 原生运行时库：按 -PntbPlatform 选择，避免每个平台包都塞入全部原生库
+    skikoRuntimes.forEach { runtime ->
+        implementation("org.jetbrains.skiko:skiko-awt-runtime-$runtime:$skikoVersion")
+    }
     // Compose 资源库（生成 Res 类，替换弃用的 painterResource(String)）
     implementation("org.jetbrains.compose.components:components-resources:1.11.1")
     // Markdown 渲染（Compose Multiplatform 版：Android 端即 Markwon，桌面端用 JetBrains markdown 解析）
@@ -56,17 +84,23 @@ kotlin {
     jvmToolchain(21)
 }
 
-// 统一打包为 fat JAR，包含所有平台的 Skiko原生库
+// 平台构建的产物后缀：all 保持旧的 NTB-all.jar 名称
+val targetClassifier = if (ntbPlatform == "all") "all" else ntbPlatform
+
+// 打包为 fat JAR；实际包含的 Skiko 原生库由 -PntbPlatform 决定
 tasks.register<Jar>("fatJar") {
     group = "distribution"
-    description = "Create a unified fat JAR with all dependencies (cross-platform)"
-    archiveClassifier.set("all")
-    
+    description = "Create a fat JAR for ntbPlatform=$ntbPlatform (dependencies + Skiko for that platform)"
+    archiveClassifier.set(targetClassifier)
+
+    inputs.property("ntbPlatform", ntbPlatform)
+
     from(sourceSets.main.get().output)
     dependsOn(configurations.runtimeClasspath)
     
     manifest {
         attributes["Main-Class"] = "main.kotlin.MainAppKt"
+        attributes["Ntb-Platform"] = ntbPlatform
     }
     
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
@@ -124,11 +158,16 @@ tasks.register("packageApp") {
 // ProGuard 规则文件（含 -dontobfuscate、-dontoptimize 及必要 keep 规则）
 val proguardRulesFile = file("proguard-rules.pro")
 
-// 原始 fat JAR（由 fatJar 生成，含全部依赖与资源）
-val fatJarFile = layout.buildDirectory.file("libs/${project.name}-all.jar")
+// 原始 fat JAR（由 fatJar 生成，含该平台所需依赖与 Skiko 原生库）
+val fatJarFile = layout.buildDirectory.file("libs/" + project.name + "-" + targetClassifier + ".jar")
 
-// ProGuard 输出的压缩 JAR
-val proguardJarFile = layout.buildDirectory.file("libs/${project.name}-shrunk.jar")
+// ProGuard 输出的压缩 JAR；all 继续使用旧的 NTB-shrunk.jar 名称
+val shrunkJarName = if (ntbPlatform == "all") {
+    project.name + "-shrunk.jar"
+} else {
+    project.name + "-" + ntbPlatform + "-shrunk.jar"
+}
+val proguardJarFile = layout.buildDirectory.file("libs/" + shrunkJarName)
 
 // 调用 ProGuard 压缩 fat JAR（只压缩、不混淆、不优化）
 tasks.register<JavaExec>("shrinkJar") {
@@ -148,11 +187,18 @@ tasks.register<JavaExec>("shrinkJar") {
     doFirst {
         // 动态生成 ProGuard 配置：把 fat JAR 作为 injars，JDK 各 jmod 作为 libraryjars。
         // Gradle daemon 可能运行在 JRE（无 jmods），因此解析工具链 JDK（JDK 21）。
-        // 用 vendor=Microsoft 排除 Temurin JRE，确保解析到带 jmods 的完整 JDK。
-        val jdkHome = javaToolchains.launcherFor {
-            languageVersion.set(JavaLanguageVersion.of(21))
-            vendor.set(JvmVendorSpec.MICROSOFT)
-        }.get().metadata.installationPath.asFile
+        // 优先使用带 jmods 的 Microsoft JDK；ARM64 Linux 上没有该 vendor 时
+        // 回退到任意已安装的 JDK 21（CI 的 setup-java 会提供完整 JDK）。
+        val jdkHome = runCatching {
+            javaToolchains.launcherFor {
+                languageVersion.set(JavaLanguageVersion.of(21))
+                vendor.set(JvmVendorSpec.MICROSOFT)
+            }.get().metadata.installationPath.asFile
+        }.getOrElse {
+            javaToolchains.launcherFor {
+                languageVersion.set(JavaLanguageVersion.of(21))
+            }.get().metadata.installationPath.asFile
+        }
         val cfg = layout.buildDirectory.file("proguard/config.pro").get().asFile
         cfg.parentFile.mkdirs()
         val sb = StringBuilder()

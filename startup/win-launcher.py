@@ -5,6 +5,7 @@ import ctypes
 from ctypes import wintypes
 import hashlib
 import os
+import platform
 import webbrowser
 
 # Windows 常量
@@ -155,7 +156,38 @@ def show_task_dialog(title, content, hyperlink_callback=None, main_instruction=N
         return None
 
 # Java 下载地址（TUNA 镜像）
-JAVA_INSTALL_URL = "https://mirrors.tuna.tsinghua.edu.cn/Adoptium/21/jre/x64/windows/OpenJDK21U-jre_x64_windows_hotspot_21.0.12.1_1.msi"
+JAVA_INSTALL_URLS = {
+    "x64": "https://mirrors.tuna.tsinghua.edu.cn/Adoptium/21/jre/x64/windows/OpenJDK21U-jre_x64_windows_hotspot_21.0.13_9.msi",
+    "arm64": "https://mirrors.tuna.tsinghua.edu.cn/Adoptium/21/jre/aarch64/windows",
+}
+
+def _normalize_arch(value):
+    value = (value or "").strip().lower()
+    if value in ("arm64", "aarch64"):
+        return "arm64"
+    if value in ("amd64", "x86_64", "x64"):
+        return "x64"
+    return value
+
+def get_native_arch():
+    """
+    当前 Windows 的原始架构。
+
+    ARM64 Windows 上如果运行的是 x64 版启动器，platform.machine() 会返回
+    AMD64；此时用 PROCESSOR_ARCHITEW6432 识别真实的 ARM64 系统。
+    """
+    arch = _normalize_arch(
+        platform.machine() or os.environ.get("PROCESSOR_ARCHITECTURE", "")
+    )
+    if arch == "x64":
+        host_arch = _normalize_arch(os.environ.get("PROCESSOR_ARCHITEW6432", ""))
+        if host_arch == "arm64":
+            return "arm64"
+    return arch
+
+def get_java_install_url():
+    arch = get_native_arch()
+    return JAVA_INSTALL_URLS.get(arch, JAVA_INSTALL_URLS["x64"])
 
 def _open_download_link(url):
     """打开下载链接"""
@@ -286,6 +318,42 @@ def get_java_version():
     except Exception:
         return None
 
+def get_java_arch():
+    """读取 Java 自身的 os.arch，用于识别 x64 模拟环境。"""
+    try:
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = SW_HIDE
+        result = subprocess.run(
+            ["java", "-XshowSettings:properties", "-version"],
+            capture_output=True,
+            text=True,
+            shell=False,
+            creationflags=CREATE_NO_WINDOW,
+            startupinfo=startupinfo
+        )
+        match = re.search(r"(?m)^\s*os\.arch\s*=\s*(\S+)", result.stderr + result.stdout)
+        return _normalize_arch(match.group(1)) if match else None
+    except Exception:
+        return None
+
+def check_java_arch():
+    native = get_native_arch()
+    java_arch = get_java_arch()
+    if native not in ("x64", "arm64") or java_arch is None or java_arch == native:
+        return True
+
+    native_label = "ARM64" if native == "arm64" else "x64"
+    java_label = "ARM64" if java_arch == "arm64" else "x64"
+    if show_yes_no_box(
+        "Java 架构不匹配",
+        f"当前 Windows 为 {native_label}，检测到 Java 为 {java_label}。\n\n"
+        f"建议安装 {native_label} 版 Java 21，否则程序可能通过模拟层运行，"
+        f"性能和本地组件兼容性可能受影响。\n\n仍要继续吗？"
+    ):
+        return True
+    return False
+
 def check_java_version(min_version=21):
     java_version = get_java_version()
     
@@ -305,7 +373,7 @@ def check_java_version(min_version=21):
         return False
     
     if java_version >= min_version:
-        return True
+        return check_java_arch()
     else:
         # 版本过低，询问是否打开浏览器引导下载
         if show_yes_no_box(
@@ -326,14 +394,16 @@ def download_and_install_java(min_version):
     打开浏览器引导用户从 TUNA 镜像下载 Java JRE MSI 并手动安装。
     下载并安装完成后，用户需重新运行本程序。
     """
-    # 打开浏览器到下载页面
+    # 按当前 Windows 架构选择 x64 / ARM64 的 JRE
+    download_url = get_java_install_url()
+    download_name = os.path.basename(download_url)
     try:
-        webbrowser.open(JAVA_INSTALL_URL)
+        webbrowser.open(download_url)
     except Exception as e:
         show_message_box(
             "打开浏览器失败",
             f"无法自动打开浏览器，请手动复制以下链接到浏览器下载：\n\n"
-            f"{JAVA_INSTALL_URL}\n\n"
+            f"{download_url}\n\n"
             f"错误信息：{str(e)}"
         )
         return False
@@ -343,7 +413,7 @@ def download_and_install_java(min_version):
         "下载 Java",
         f"已打开浏览器，正在从 TUNA 镜像下载 Java {min_version} JRE 安装包\n\n"
         f"若下载还未开始，请点击此链接重新下载：\n"
-        f"<a href=\"{JAVA_INSTALL_URL}\">OpenJDK21U-jre_x64_windows_hotspot_21.0.12_8.msi</a>\n\n"
+        f"<a href=\"{download_url}\">{download_name}</a>\n\n"
         f"下载完成后，请运行下载的 MSI 文件完成安装。\n"
         f"安装完成后，重新运行本程序。",
         main_instruction=f"下载 Java {min_version} JRE",

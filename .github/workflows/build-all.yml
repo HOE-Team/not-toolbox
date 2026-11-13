@@ -1,0 +1,242 @@
+name: Build all artifacts
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-all-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  JAVA_VERSION: "21"
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Cross-platform JAR: Windows + Linux, x64 + ARM64 Skiko
+  # ---------------------------------------------------------------------------
+  jar-all:
+    name: JAR / all platforms
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21 (x64)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          architecture: x64
+
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build all-platform JAR
+        run: ./gradlew --no-daemon build shrinkJar -PntbPlatform=all
+
+      - name: Stage JARs
+        run: |
+          set -euo pipefail
+          mkdir -p dist/jar-all
+          cp build/libs/NTB-all.jar dist/jar-all/
+          cp build/libs/NTB-shrunk.jar dist/jar-all/
+          (cd dist/jar-all && sha256sum * > SHA256SUMS.txt)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jar-all
+          path: dist/jar-all
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Windows installers: x64 and ARM64 native launchers
+  # ---------------------------------------------------------------------------
+  windows:
+    name: Windows ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            arch: x64
+            jdk_arch: x64
+            python_arch: x64
+          - os: windows-11-arm
+            arch: arm64
+            jdk_arch: aarch64
+            python_arch: arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          architecture: ${{ matrix.jdk_arch }}
+
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          architecture: ${{ matrix.python_arch }}
+
+      - name: Install PyInstaller
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "pyinstaller>=6.10"
+          python -c "import platform; print('Python architecture:', platform.machine())"
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          $iscc = Get-ChildItem 'C:\Program Files*\Inno Setup*\ISCC.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $iscc) {
+            choco install innosetup --yes --no-progress
+            $iscc = Get-ChildItem 'C:\Program Files*\Inno Setup*\ISCC.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+          }
+          if (-not $iscc) { throw "ISCC.exe not found" }
+          "ISCC_PATH=$($iscc.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Build Windows JAR and native launcher
+        shell: pwsh
+        run: |
+          .\gradlew.bat --no-daemon shrinkJar "-PntbPlatform=windows"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          # Inno Setup still reads build/libs/NTB-shrunk.jar.
+          Copy-Item build\libs\NTB-windows-shrunk.jar build\libs\NTB-shrunk.jar -Force
+          $hash = (Get-FileHash build\libs\NTB-shrunk.jar -Algorithm SHA256).Hash.ToLower()
+          Set-Content -Path startup\binary_sha256.sha256 -Value $hash -NoNewline -Encoding ascii
+          Remove-Item startup\binary_sha256.sha256.asc -ErrorAction SilentlyContinue
+
+          cmd /c "startup\win-launcher-pyi.bat ${{ matrix.arch }}"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          Push-Location startup
+          try {
+            & $env:ISCC_PATH "/DTargetArch=${{ matrix.arch }}" "pack-exe.iss"
+            if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }
+          } finally {
+            Pop-Location
+          }
+
+      - name: Stage Windows artifacts
+        shell: pwsh
+        run: |
+          $out = "dist\win-${{ matrix.arch }}"
+          New-Item -ItemType Directory -Path $out -Force | Out-Null
+          $setup = if ("${{ matrix.arch }}" -eq "arm64") {
+            "not_toolbox_setup_win_arm64.exe"
+          } else {
+            "not_toolbox_setup_win_x86-64.exe"
+          }
+          Copy-Item "startup\installer\$setup" $out -Force
+          Copy-Item build\libs\NTB-windows-shrunk.jar $out -Force
+          Get-ChildItem $out | Select-Object Name,Length
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: win-${{ matrix.arch }}
+          path: dist/win-${{ matrix.arch }}
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Linux packages: x64 and ARM64
+  # ---------------------------------------------------------------------------
+  linux:
+    name: Linux ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            arch: x64
+            jdk_arch: x64
+          - os: ubuntu-24.04-arm
+            arch: arm64
+            jdk_arch: aarch64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          architecture: ${{ matrix.jdk_arch }}
+
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build Linux JAR
+        run: ./gradlew --no-daemon shrinkJar -PntbPlatform=linux
+
+      - name: Package Linux tar
+        run: |
+          set -euo pipefail
+          stage="dist/linux-${{ matrix.arch }}"
+          mkdir -p "$stage/res"
+          cp build/libs/NTB-linux-shrunk.jar "$stage/NTB-shrunk.jar"
+          cp startup/linux-startup.sh "$stage/linux-startup.sh"
+          chmod +x "$stage/linux-startup.sh"
+          cp startup/res-py/GoldenHoe_pub.asc "$stage/res/"
+          if [ -f startup/res-py/FINGERPRINT.txt ]; then
+            cp startup/res-py/FINGERPRINT.txt "$stage/res/"
+          fi
+          (cd "$stage" && sha256sum NTB-shrunk.jar > binary_sha256.sha256)
+          tar -czf "dist/NTB-linux-${{ matrix.arch }}.tar.gz" -C "$stage" .
+          cp build/libs/NTB-linux-shrunk.jar dist/
+          rm -rf "$stage"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.arch }}
+          path: dist
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Combine all build artifacts and checksums (no publishing)
+  # ---------------------------------------------------------------------------
+  bundle:
+    name: Build artifact bundle
+    needs: [jar-all, windows, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Flatten and hash artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p bundle
+          find artifacts -type f ! -name 'SHA256SUMS.txt' -exec cp -f {} bundle/ \;
+          cat > bundle/BUILD-INFO.txt <<EOF
+          Build: NOT Toolbox
+          Commit: ${{ github.sha }}
+          Ref: ${{ github.ref }}
+          Run: ${{ github.run_id }}
+          Host: GitHub Actions
+          EOF
+          (cd bundle && sha256sum * > SHA256SUMS.txt)
+          ls -lh bundle
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-bundle
+          path: bundle
+          if-no-files-found: error
+

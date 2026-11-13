@@ -91,16 +91,37 @@ Windows 10 1507+（内部版本 10240），需要至少存在一种包管理器�
 git clone https://github.com/HOE-Team/not-toolbox.git
 cd not-toolbox
 
-# 构建可执行JAR
+# 默认构建跨平台 JAR（包含 Windows/Linux 的 x64 与 ARM64 Skiko 原生库）
 ./gradlew fatJar
-# 或构建一个经过ProGuard压缩的包
-./gradle shrinkJar
+# 或构建一个经过 ProGuard 压缩的包
+./gradlew shrinkJar
+
+# 仅 Windows：只包含 Windows x64/ARM64 的 Skiko 原生库
+./gradlew fatJar -PntbPlatform=windows
+./gradlew shrinkJar -PntbPlatform=windows
+
+# 仅 Linux：只包含 Linux x64/ARM64 的 Skiko 原生库
+./gradlew fatJar -PntbPlatform=linux
+./gradlew shrinkJar -PntbPlatform=linux
 
 # 运行应用程序
 java -jar build/libs/NTB-all.jar
-# 或
 java -jar build/libs/NTB-shrunk.jar
+
+# 平台专用产物
+java -jar build/libs/NTB-windows.jar
+java -jar build/libs/NTB-linux.jar
+java -jar build/libs/NTB-windows-shrunk.jar
+java -jar build/libs/NTB-linux-shrunk.jar
 ```
+
+构建产物：
+
+| 命令 | JAR |
+|---|---|
+| 默认 / `-PntbPlatform=all` | `NTB-all.jar`、`NTB-shrunk.jar` |
+| `-PntbPlatform=windows` | `NTB-windows.jar`、`NTB-windows-shrunk.jar` |
+| `-PntbPlatform=linux` | `NTB-linux.jar`、`NTB-linux-shrunk.jar` |
 
 ## 📦 JAR分发说明
 

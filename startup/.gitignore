@@ -4,6 +4,9 @@ pyi
 # Inno Setup
 installer
 
+# Collected release outputs
+b-outputs/
+
 # TAR
 *.tar.gz
 
