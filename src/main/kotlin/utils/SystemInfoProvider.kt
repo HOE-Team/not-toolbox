@@ -1041,6 +1041,80 @@ object SystemInfoProvider {
         return resolved
     }
 
+    /**
+     * 读取当前桌面壁纸的绝对路径，供动态取色使用。
+     *
+     * 与概览卡片不同，这里不受“不获取桌面壁纸/使用本地图像”开关影响，
+     * 始终尝试读取真实桌面壁纸。
+     */
+    fun getDesktopWallpaperPath(): String? {
+        val os = System.getProperty("os.name").lowercase()
+        return when {
+            os.contains("windows") -> readWindowsWallpaperPath()
+            os.contains("linux") -> readLinuxWallpaperPath()
+            else -> null
+        }
+    }
+
+    /** 读取 Linux 桌面壁纸：优先 gsettings，其次 KDE / XFCE 配置。 */
+    private fun readLinuxWallpaperPath(): String? {
+        val gsettingsTargets = listOf(
+            "org.gnome.desktop.background picture-uri",
+            "org.gnome.desktop.background picture-uri-dark",
+            "org.cinnamon.desktop.background picture-uri",
+            "org.mate.background picture-filename"
+        )
+        for (target in gsettingsTargets) {
+            try {
+                val raw = executeCommandUtf8("gsettings get $target")
+                parseWallpaperLocation(raw)?.let { return it }
+            } catch (_: Exception) {
+            }
+        }
+
+        try {
+            val kde = java.io.File(System.getProperty("user.home"), ".config/plasma-org.kde.plasma.desktop-appletsrc")
+            if (kde.isFile) {
+                val line = kde.readLines().lastOrNull { it.startsWith("Image=") }
+                if (line != null) {
+                    parseWallpaperLocation(line.substringAfter("Image="))?.let { return it }
+                }
+            }
+        } catch (_: Exception) {
+        }
+
+        try {
+            val xfce = java.io.File(
+                System.getProperty("user.home"),
+                ".config/xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.xml"
+            )
+            if (xfce.isFile) {
+                val match = Regex("name=\"last-image\"[^>]*value=\"([^\"]+)\"")
+                    .find(xfce.readText())
+                match?.groupValues?.getOrNull(1)?.let { raw ->
+                    parseWallpaperLocation(raw)?.let { return it }
+                }
+            }
+        } catch (_: Exception) {
+        }
+
+        return null
+    }
+
+    private fun parseWallpaperLocation(raw: String?): String? {
+        var value = raw?.trim()?.trim('\'', '"') ?: return null
+        if (value.isBlank() || value.equals("none", ignoreCase = true)) return null
+        if (value.startsWith("file://")) {
+            value = try {
+                java.nio.file.Paths.get(java.net.URI(value)).toString()
+            } catch (_: Exception) {
+                java.net.URLDecoder.decode(value.removePrefix("file://"), "UTF-8")
+            }
+        }
+        val file = java.io.File(value)
+        return if (file.isFile) file.absolutePath else null
+    }
+
     /** 读取 Windows 当前壁纸：注册表 WallPaper，失败时回退到 TranscodedWallpaper。 */
     private fun readWindowsWallpaperPath(): String? {
         try {

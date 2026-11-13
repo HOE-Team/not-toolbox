@@ -48,6 +48,8 @@ fun SettingsScreen(
     onThemeChange: (Boolean) -> Unit = {},
     selectedColor: String = "",
     onColorChange: (String) -> Unit = {},
+    useDynamicColor: Boolean = true,
+    onUseDynamicColorChange: (Boolean) -> Unit = {},
     selectedPackageManager: PackageManagerType = PackageManagerType.UNKNOWN,
     onPackageManagerChange: (PackageManagerType) -> Unit = {},
     useProxy: Boolean = false,
@@ -74,7 +76,7 @@ fun SettingsScreen(
     onCloseSessionOnEndChange: (Boolean) -> Unit = {}
 ) {
     var localDarkTheme by remember { mutableStateOf(isDarkTheme) }
-    var hexInput by remember { mutableStateOf(selectedColor) }
+    var hexInput by remember(selectedColor) { mutableStateOf(selectedColor) }
     var saveStateMessage by remember { mutableStateOf<String?>(null) }
     var displayNameInput by remember(displayName) { mutableStateOf(displayName) }
     var greetingModeInput by remember(greetingMode) { mutableStateOf(greetingMode) }
@@ -115,16 +117,21 @@ fun SettingsScreen(
             }
 
             SettingsRow(
-                icon = MaterialSymbols.Animation,
-                title = "波浪形进度指示器",
-                subtitle = "开启后程序内的状态指示器都将被更新为波浪形"
+                icon = MaterialSymbols.Palette,
+                title = "使用动态色彩",
+                subtitle = if (useDynamicColor) {
+                    "从当前桌面壁纸提取强调色"
+                } else {
+                    "已关闭壁纸取色，可手动指定 HEX 颜色"
+                }
             ) {
                 Switch(
-                    checked = useWavyProgress,
-                    onCheckedChange = onUseWavyProgressChange
+                    checked = useDynamicColor,
+                    onCheckedChange = onUseDynamicColorChange
                 )
             }
 
+            if (!useDynamicColor) {
             val isValid = remember(hexInput) { isValidHex(hexInput.trim()) }
             SettingsRow(
                 icon = MaterialSymbols.Palette,
@@ -174,6 +181,18 @@ fun SettingsScreen(
                         )
                     }
                 }
+            }
+            }
+
+            SettingsRow(
+                icon = MaterialSymbols.Animation,
+                title = "波浪形进度指示器",
+                subtitle = "开启后程序内的状态指示器都将被更新为波浪形"
+            ) {
+                Switch(
+                    checked = useWavyProgress,
+                    onCheckedChange = onUseWavyProgressChange
+                )
             }
 
             SettingsRow(

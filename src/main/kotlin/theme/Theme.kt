@@ -62,8 +62,14 @@ private val ExpressiveTypography: Typography = run {
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun AppTheme(darkTheme: Boolean, seedHex: String?, content: @Composable () -> Unit) {
-    val seedColor: Color? = seedHex?.let { parseHexToColor(it) }
+fun AppTheme(
+    darkTheme: Boolean,
+    seedHex: String?,
+    dynamicSeed: Color? = null,
+    content: @Composable () -> Unit
+) {
+    val colorFromHex: Color? = seedHex?.let { parseHexToColor(it) }
+    val seedColor: Color? = dynamicSeed ?: colorFromHex
     val base = seedColor ?: Color(0xFF6750A4) // fallback seed
     val scheme = generateColorScheme(base, darkTheme)
 

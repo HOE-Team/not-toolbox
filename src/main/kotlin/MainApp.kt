@@ -16,6 +16,7 @@ import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
@@ -26,7 +27,10 @@ import components.BackgroundTaskDialog
 import components.MaterialSymbols
 import components.NavRail
 import config.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import ntb.generated.resources.Res
 import ntb.generated.resources.logo
 import org.jetbrains.compose.resources.painterResource
@@ -114,6 +118,7 @@ fun main() = application {
         val loaded = loadConfig()
         var isDark by remember { mutableStateOf(loaded.dark) }
         var seedHex by remember { mutableStateOf(loaded.color) }
+        var useDynamicColor by remember { mutableStateOf(loaded.useDynamicColor) }
         var useProxy by remember { mutableStateOf(loaded.useProxy) }
         var proxyUrl by remember { mutableStateOf(loaded.proxyUrl) }
         // 包管理器选择状态（默认自动检测）
@@ -164,6 +169,21 @@ fun main() = application {
         WallpaperState.useCustomBg = useCustomBg
         WallpaperState.customBgFileName = customBgFile
 
+        // 壁纸动态取色：开启时定期检查壁纸是否变化，关闭时立即回到 HEX/默认色。
+        var dynamicSeed by remember { mutableStateOf<Color?>(null) }
+        LaunchedEffect(useDynamicColor, useCustomBg, customBgFile) {
+            if (!useDynamicColor) {
+                dynamicSeed = null
+                return@LaunchedEffect
+            }
+            while (true) {
+                dynamicSeed = withContext(Dispatchers.IO) {
+                    DynamicColorProvider.currentSeed()
+                }
+                delay(30_000L)
+            }
+        }
+
         // 将所有设置持久化。集中为一处，避免各事件处理器里手写 AppConfig 遗漏字段
         // （例如漏掉 greetingMode/customGreeting 会在改其它设置时把问候语重置为默认）。
         fun persist() {
@@ -171,6 +191,7 @@ fun main() = application {
                 AppConfig(
                     dark = isDark,
                     color = seedHex,
+                    useDynamicColor = useDynamicColor,
                     useProxy = useProxy,
                     proxyUrl = proxyUrl,
                     terminalEncoding = terminalEncoding,
@@ -195,7 +216,11 @@ fun main() = application {
             else -> resolveGreeting(GreetingMode.fromName(greetingMode), displayName, customGreeting)
         }
 
-        AppTheme(darkTheme = isDark, seedHex = seedHex) {
+        AppTheme(
+            darkTheme = isDark,
+            seedHex = seedHex,
+            dynamicSeed = if (useDynamicColor) dynamicSeed else null
+        ) {
             CompositionLocalProvider(LocalWavyProgress provides useWavyProgress) {
             AppScaffold(
                 startBar = {
@@ -323,6 +348,11 @@ fun main() = application {
                         selectedColor = seedHex ?: "",
                         onColorChange = { hex ->
                             seedHex = hex.ifBlank { null }
+                            persist()
+                        },
+                        useDynamicColor = useDynamicColor,
+                        onUseDynamicColorChange = { enabled ->
+                            useDynamicColor = enabled
                             persist()
                         },
                         selectedPackageManager = selectedPackageManager,

@@ -53,8 +53,10 @@ enum class GreetingMode(val displayName: String) {
 }
 
 data class AppConfig(
-    val dark: Boolean = false, 
-    val color: String? = null, 
+    val dark: Boolean = false,
+    val color: String? = null,
+    // 是否使用壁纸动态取色（默认开启；关闭后才使用 color）
+    val useDynamicColor: Boolean = true,
     val useProxy: Boolean = false,
     val proxyUrl: String = "https://gh-proxy.com",
     val terminalEncoding: String = "UTF-8",
@@ -83,6 +85,7 @@ fun loadConfig(): AppConfig {
         val lines = Files.readAllLines(configPath)
         var dark: Boolean = false
         var color: String? = null
+        var useDynamicColor: Boolean = true
         var useProxy: Boolean = false
         var proxyUrl: String = "https://gh-proxy.com"
         var terminalEncoding: String = "UTF-8"
@@ -108,6 +111,11 @@ fun loadConfig(): AppConfig {
                     var v = parts[1].trim()
                     if (v.startsWith("\"") && v.endsWith("\"")) v = v.substring(1, v.length - 1)
                     if (v.isNotBlank()) color = v
+                }
+            } else if (line.startsWith("use_dynamic_color")) {
+                val parts = line.split('=', limit = 2)
+                if (parts.size == 2) {
+                    useDynamicColor = parts[1].trim().lowercase() == "true"
                 }
             } else if (line.startsWith("use_proxy")) {
                 val parts = line.split('=', limit = 2)
@@ -180,7 +188,7 @@ fun loadConfig(): AppConfig {
                 }
             }
         }
-        AppConfig(dark = dark, color = color, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, greetingMode = greetingMode, customGreeting = customGreeting, useCustomBg = useCustomBg, customBgFile = customBgFile, wavyProgress = wavyProgress, toolCommandSession = toolCommandSession, closeSessionOnEnd = closeSessionOnEnd)
+        AppConfig(dark = dark, color = color, useDynamicColor = useDynamicColor, useProxy = useProxy, proxyUrl = proxyUrl, terminalEncoding = terminalEncoding, displayName = displayName, greetingMode = greetingMode, customGreeting = customGreeting, useCustomBg = useCustomBg, customBgFile = customBgFile, wavyProgress = wavyProgress, toolCommandSession = toolCommandSession, closeSessionOnEnd = closeSessionOnEnd)
     } catch (e: Exception) {
         AppConfig()
     }
@@ -201,6 +209,7 @@ fun saveConfig(cfg: AppConfig) {
             sb.append("\"\"")
         }
         sb.append('\n')
+        sb.append("use_dynamic_color = ").append(if (cfg.useDynamicColor) "true" else "false").append('\n')
         sb.append("use_proxy = ").append(if (cfg.useProxy) "true" else "false").append('\n')
         sb.append("proxy_url = \"").append(cfg.proxyUrl).append("\"\n")
         sb.append("terminal_encoding = \"").append(cfg.terminalEncoding).append("\"\n")
