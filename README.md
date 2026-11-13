@@ -1,11 +1,11 @@
 <h1 align="center">NOT Toolbox/“非工具箱”</h1>
-<h3 align="center">Network-centric/网络中心化, Open-source/开源, Trans-platform/跨平台</h3>
+<h3 align="center">Neural/智能, Open-source/开源, Trans-platform/跨平台</h3>
 
 <div align="center">
     <img width="150" src="images/logo.png" alt="项目Logo">
 </div>
 
-<h4 align="center">一款跨平台，功能强大，去本地化的工具箱</h4>
+<h4 align="center">一款多功能、现代化、AI加持的包管理器前端</h4>
 
 <div align="center">
 
@@ -19,7 +19,7 @@
 > 我们诚挚的邀请您参与我们的生态建设，欢迎通过Issue、Pull Request协助我们开发NOT Toolbox及[资源仓库](https://github.com/HOE-Team/not-toolbox-resource)，我们将不胜感激。
 
 > [!NOTE]
-> Agent 功能已经进入发布候选阶段！点击[此处](https://github.com/HOE-Team/not-toolbox/releases/tag/O-1.0.7-RC1)了解最新的功能更改
+> Agent和完整包管理功能已经进入测试阶段！点击[此处](https://github.com/HOE-Team/not-toolbox/releases/latest)了解最新的功能更改
 
 ## 📑 目录
 
