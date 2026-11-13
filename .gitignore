@@ -12,6 +12,8 @@
 
 # Package Files #
 *.jar
+# Gradle wrapper must be tracked so CI checkouts can run ./gradlew
+!/gradle/wrapper/gradle-wrapper.jar
 *.war
 *.nar
 *.ear
