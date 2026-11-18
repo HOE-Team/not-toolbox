@@ -5,7 +5,7 @@
     <img width="150" src="images/logo.png" alt="项目Logo">
 </div>
 
-<h4 align="center">一款多功能、现代化、AI加持的包管理器前端</h4>
+<h4 align="center">一款多功能、现代化的AI包管理器前端</h4>
 
 <div align="center">
 
@@ -56,6 +56,9 @@ Windows 10 1507+（内部版本 10240），需要至少存在一种包管理器�
 * **Java环境**：Java 21 或更高版本
 * **网络**：需要稳定网络连接（用于包管理器操作）
 * **权限**：Linux平台上需要sudo权限，否则将无法使用大部分功能，在Windows需要用户同意UAC（由包管理器发起，NOT Toolbox程序不提升权限）
+
+> [!CAUTION]
+> 即使这个项目可以在 Windows Server 2012 R2/Windows 8.1 甚至更低的操作系统上运行，我们也不推荐这样做，因为程序本身是为 Windows 10 及更高版本的系统设计的，我们从未也没有计划对更低的系统版本做支持，它可能不稳定，如果您希望在旧版 Windows PC上运行它，请尽力而为，我们不会对旧版 Windows 提供任何支持。
 
 ## 🚀 安装和运行
 ### 使用启动器(Windows)或启动脚本(Linux)
